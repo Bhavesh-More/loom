@@ -15,11 +15,23 @@ export type AgentCardData = {
 
 type AgentCardProps = {
   agent: AgentCardData
+  isSelected: boolean
+  onAddToTeam: (agent: AgentCardData) => void
+  onRemoveFromTeam: (agentName: string) => void
 }
 
-function AgentCard({ agent }: AgentCardProps) {
+function AgentCard({
+  agent,
+  isSelected,
+  onAddToTeam,
+  onRemoveFromTeam,
+}: AgentCardProps) {
   return (
-    <article className={`agent-card${agent.type === 'Community' ? ' agent-card--community' : ''}`}>
+    <article
+      className={`agent-card${agent.type === 'Community' ? ' agent-card--community' : ''}${
+        isSelected ? ' agent-card--selected' : ''
+      }`}
+    >
       <div className="agent-card__header">
         <div className="agent-card__identity">
           <div className={`market-icon market-icon--${agent.tone}`}>
@@ -60,7 +72,20 @@ function AgentCard({ agent }: AgentCardProps) {
       </div>
 
       <div className="agent-card__actions">
-        <button type="button">Add to Team</button>
+        <button
+          className={isSelected ? 'agent-card__team-button--selected' : undefined}
+          type="button"
+          onClick={() =>
+            isSelected ? onRemoveFromTeam(agent.name) : onAddToTeam(agent)
+          }
+        >
+          <span className="agent-card__team-label">
+            {isSelected ? 'In Team' : 'Add to Team'}
+          </span>
+          {isSelected ? (
+            <span className="agent-card__team-remove-label">Remove from Team</span>
+          ) : null}
+        </button>
         <a href="#">Details</a>
       </div>
     </article>
