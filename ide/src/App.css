@@ -145,19 +145,15 @@ button {
 }
 
 .sidebar__footer {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
   border-top: 1px solid var(--outline-variant);
   padding: 16px;
 }
 
-.market-hero__cta {
+.sidebar-create-agent {
   display: flex;
-  width: fit-content;
+  width: 80%;
   align-items: center;
   justify-content: center;
-  gap: 8px;
   border: 0;
   border-radius: 8px;
   background: #ffffff;
@@ -165,18 +161,17 @@ button {
   font-size: 14px;
   font-weight: 600;
   line-height: 20px;
-  margin: 24px 0 0;
   padding: 10px 16px;
   transition:
     background 180ms ease,
     transform 180ms ease;
 }
 
-.market-hero__cta:hover {
+.sidebar-create-agent:hover {
   background: #f3f3f3;
 }
 
-.market-hero__cta:active {
+.sidebar-create-agent:active {
   transform: scale(0.98);
 }
 
@@ -1809,6 +1804,73 @@ button {
   font-family: var(--font-body);
   font-size: 16px;
   line-height: 24px;
+}
+
+.market-hero__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 24px;
+  border: 1px solid color-mix(in srgb, var(--outline-variant) 45%, transparent);
+  border-radius: 10px;
+  background: #ffffff;
+  color: #000000;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  padding: 12px 18px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.18);
+  transition:
+    background 180ms ease,
+    border-color 180ms ease,
+    transform 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.market-hero__cta:hover {
+  background: #f4f4f4;
+  border-color: color-mix(in srgb, var(--outline-variant) 65%, transparent);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.22);
+  transform: translateY(-1px);
+}
+
+.market-hero__cta:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
+}
+
+.market-hero__cta .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.market-hero__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 24px;
+  border: 0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #000000;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  padding: 10px 16px;
+  transition:
+    background 180ms ease,
+    transform 180ms ease;
+}
+
+.market-hero__cta:hover {
+  background: #f3f3f3;
+}
+
+.market-hero__cta:active {
+  transform: scale(0.98);
+}
+
+.market-hero__cta .material-symbols-outlined {
+  font-size: 18px;
 }
 
 .market-search > .material-symbols-outlined {
