@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 import type { AgentCardData } from './AgentCard'
 import MaterialIcon from './MaterialIcon'
 
@@ -12,6 +14,8 @@ function ProjectCheckoutModal({
   onClose,
   onRemoveAgent,
 }: ProjectCheckoutModalProps) {
+  const [projectPath, setProjectPath] = useState('')
+
   return (
     <div className="checkout-modal" role="presentation">
       <div className="checkout-modal__panel" role="dialog" aria-modal="true" aria-labelledby="checkout-title">
@@ -48,14 +52,19 @@ function ProjectCheckoutModal({
           <label>
             <span>Project description</span>
             <textarea
-              rows={4}
+              rows={10}
               placeholder="Describe what this agent team should build, automate, or maintain."
             />
           </label>
 
           <label>
-            <span>Repository or workspace path</span>
-            <input type="text" placeholder="D:\\STUDY\\PROJECTS\\loom\\new-project" />
+            <span>GitHub repository</span>
+            <input
+              type="text"
+              value={projectPath}
+              placeholder="Enter GitHub repo to continue"
+              onChange={(event) => setProjectPath(event.target.value)}
+            />
           </label>
 
           <div className="checkout-form__actions">

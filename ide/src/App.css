@@ -1971,11 +1971,11 @@ button {
   width: min(360px, calc(100vw - 32px));
   max-height: 420px;
   flex-direction: column;
-  border: 1px solid var(--outline-variant);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--surface-container-lowest) 96%, transparent);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(16px);
+  border: 1px solid color-mix(in srgb, var(--outline-variant) 80%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface-container-lowest) 94%, transparent);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(18px);
 }
 
 .team-cart__header {
@@ -1983,8 +1983,8 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  border-bottom: 1px solid var(--outline-variant);
-  padding: 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--outline-variant) 85%, transparent);
+  padding: 18px 18px 16px;
 }
 
 .team-cart__header p,
@@ -2008,18 +2008,20 @@ button {
   height: 40px;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--outline-variant);
-  border-radius: 8px;
-  background: var(--surface-container);
+  border: 1px solid color-mix(in srgb, var(--outline-variant) 85%, transparent);
+  border-radius: 10px;
+  background: var(--surface-container-high);
   color: var(--primary);
 }
 
 .team-cart__items {
   display: flex;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   flex-direction: column;
   gap: 10px;
-  padding: 12px;
+  padding: 14px 14px 6px;
 }
 
 .team-cart__empty {
@@ -2035,10 +2037,15 @@ button {
   grid-template-columns: 40px 1fr 32px;
   align-items: center;
   gap: 10px;
-  border: 1px solid var(--outline-variant);
-  border-radius: 8px;
-  background: var(--surface-container-low);
-  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--outline-variant) 78%, transparent);
+  border-radius: 12px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-container) 88%, transparent),
+    color-mix(in srgb, var(--surface-container-low) 94%, transparent)
+  );
+  padding: 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .team-cart__item .market-icon {
@@ -2086,18 +2093,26 @@ button {
 }
 
 .team-cart__checkout {
-  margin: 0 12px 12px;
-  border: 0;
-  border-radius: 8px;
+  margin: 10px 14px 14px;
+  border: 1px solid color-mix(in srgb, var(--outline-variant) 45%, transparent);
+  border-radius: 12px;
   background: var(--primary);
-  color: var(--on-primary);
+  color: #000000;
   font-size: 14px;
   font-weight: 700;
   line-height: 20px;
-  padding: 12px 16px;
+  padding: 13px 16px;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
   transition:
+    background 180ms ease,
+    box-shadow 180ms ease,
     opacity 180ms ease,
     transform 180ms ease;
+}
+
+.team-cart__checkout:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--primary) 92%, var(--surface-container-lowest));
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.22);
 }
 
 .team-cart__checkout:disabled {
@@ -2212,6 +2227,48 @@ button {
   transition: border-color 180ms ease;
 }
 
+.checkout-form__path-row {
+  display: flex;
+  align-items: stretch;
+}
+
+.checkout-form__path-row input {
+  min-width: 0;
+  flex: 1;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.checkout-form__path-row button {
+  flex: 0 0 auto;
+  border: 1px solid var(--outline-variant);
+  border-left: 0;
+  border-radius: 0 8px 8px 0;
+  background: var(--surface-container-high);
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  padding: 11px 14px;
+  transition:
+    background 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease;
+}
+
+.checkout-form__path-row button:hover {
+  background: var(--surface-container-highest);
+  color: var(--primary);
+}
+
+.checkout-form__error {
+  display: block;
+  margin-top: 6px;
+  color: var(--error);
+  font-size: 12px;
+  line-height: 16px;
+}
+
 .checkout-form textarea {
   resize: vertical;
 }
@@ -2247,9 +2304,26 @@ button {
 }
 
 .checkout-form__actions button:last-child {
-  border-color: var(--primary);
-  background: var(--primary);
-  color: var(--on-primary);
+  border: 1px solid color-mix(in srgb, var(--outline-variant) 45%, transparent);
+  border-radius: 8px;
+  background: #ffffff;
+  color: #000000;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.16);
+  transition:
+    background 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.checkout-form__actions button:last-child:hover {
+  background: #f3f3f3;
+  border-color: color-mix(in srgb, var(--outline-variant) 65%, transparent);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.2);
+}
+
+.checkout-form__actions button:last-child:active {
+  transform: scale(0.98);
 }
 
 @media (max-width: 900px) {
