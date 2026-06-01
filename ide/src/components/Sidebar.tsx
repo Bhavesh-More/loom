@@ -1,6 +1,6 @@
 import MaterialIcon from './MaterialIcon'
 
-export type AppPage = 'chat' | 'marketplace' | 'project'
+export type AppPage = 'chat' | 'marketplace'
 
 type SidebarProps = {
   activePage: AppPage
@@ -10,7 +10,6 @@ type SidebarProps = {
 const primaryNav = [
   { label: 'New chat', icon: 'add_box', page: 'chat' as const },
   { label: 'Marketplace', icon: 'search', page: 'marketplace' as const },
-  { label: 'New Project', icon: 'create_new_folder', page: 'project' as const },
 ]
 
 const projects = [{ label: 'foxy', icon: 'folder_open' }]

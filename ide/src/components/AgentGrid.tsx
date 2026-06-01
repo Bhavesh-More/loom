@@ -176,11 +176,22 @@ const agents: AgentCardData[] = [
   },
 ]
 
-function AgentGrid() {
+type AgentGridProps = {
+  selectedAgents: AgentCardData[]
+  onAddToTeam: (agent: AgentCardData) => void
+  onRemoveFromTeam: (agentName: string) => void
+}
+
+function AgentGrid({
+  selectedAgents,
+  onAddToTeam,
+  onRemoveFromTeam,
+}: AgentGridProps) {
   const [showAllAgents, setShowAllAgents] = useState(false)
 
   const visibleAgents = showAllAgents ? agents : agents.slice(0, INITIAL_VISIBLE_AGENTS)
   const remainingAgents = agents.length - visibleAgents.length
+  const selectedAgentNames = new Set(selectedAgents.map((agent) => agent.name))
 
   return (
     <section className="agent-section">
@@ -193,7 +204,13 @@ function AgentGrid() {
 
       <div className="agent-grid">
         {visibleAgents.map((agent) => (
-          <AgentCard agent={agent} key={agent.name} />
+          <AgentCard
+            agent={agent}
+            isSelected={selectedAgentNames.has(agent.name)}
+            key={agent.name}
+            onAddToTeam={onAddToTeam}
+            onRemoveFromTeam={onRemoveFromTeam}
+          />
         ))}
       </div>
 

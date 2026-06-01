@@ -1,6 +1,18 @@
 import MaterialIcon from './MaterialIcon'
+import type { AgentCardData } from './AgentCard'
+import MarketplaceCart from './MarketplaceCart'
 
-function MarketplaceHero() {
+type MarketplaceHeroProps = {
+  selectedAgents: AgentCardData[]
+  onCheckout: () => void
+  onRemoveFromTeam: (agentName: string) => void
+}
+
+function MarketplaceHero({
+  selectedAgents,
+  onCheckout,
+  onRemoveFromTeam,
+}: MarketplaceHeroProps) {
   return (
     <section className="market-hero">
       <div className="market-hero__copy">
@@ -23,6 +35,12 @@ function MarketplaceHero() {
           <span>Create Agent</span>
         </button>
       </div>
+
+      <MarketplaceCart
+        agents={selectedAgents}
+        onCheckout={onCheckout}
+        onRemove={onRemoveFromTeam}
+      />
     </section>
   )
 }
