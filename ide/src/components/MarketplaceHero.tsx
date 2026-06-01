@@ -17,6 +17,11 @@ function MarketplaceHero() {
             placeholder="Search agents by name, specialty, or library..."
           />
         </label>
+
+        <button className="market-hero__cta" type="button">
+          <MaterialIcon name="add" />
+          <span>Create Agent</span>
+        </button>
       </div>
     </section>
   )

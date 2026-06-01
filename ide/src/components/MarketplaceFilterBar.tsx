@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 const filters = [
   'All Agents',
   'Auth',
@@ -10,14 +12,17 @@ const filters = [
 ]
 
 function MarketplaceFilterBar() {
+  const [activeFilter, setActiveFilter] = useState(filters[0])
+
   return (
     <div className="market-filter-bar">
       <div className="market-filter-bar__chips" aria-label="Marketplace filters">
-        {filters.map((filter, index) => (
+        {filters.map((filter) => (
           <button
-            className={`market-chip${index === 0 ? ' market-chip--active' : ''}`}
+            className={`market-chip${filter === activeFilter ? ' market-chip--active' : ''}`}
             type="button"
             key={filter}
+            onClick={() => setActiveFilter(filter)}
           >
             {filter}
           </button>

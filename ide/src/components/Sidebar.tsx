@@ -1,6 +1,6 @@
 import MaterialIcon from './MaterialIcon'
 
-export type AppPage = 'workspace' | 'marketplace'
+export type AppPage = 'chat' | 'marketplace' | 'project'
 
 type SidebarProps = {
   activePage: AppPage
@@ -8,8 +8,9 @@ type SidebarProps = {
 }
 
 const primaryNav = [
-  { label: 'New project', icon: 'add_box', page: 'workspace' as const },
+  { label: 'New chat', icon: 'add_box', page: 'chat' as const },
   { label: 'Marketplace', icon: 'search', page: 'marketplace' as const },
+  { label: 'New Project', icon: 'create_new_folder', page: 'project' as const },
 ]
 
 const projects = [{ label: 'foxy', icon: 'folder_open' }]
@@ -54,6 +55,16 @@ function Sidebar({ activePage, onNavigate }: SidebarProps) {
       </nav>
 
       <div className="sidebar__footer">
+        <a className="sidebar-link" href="#">
+          <MaterialIcon name="info" />
+          <span>Support</span>
+        </a>
+
+        <a className="sidebar-link" href="#">
+          <MaterialIcon name="book" />
+          <span>Documentation</span>
+        </a>
+
         <a className="sidebar-link" href="#">
           <MaterialIcon name="settings" />
           <span>Settings</span>

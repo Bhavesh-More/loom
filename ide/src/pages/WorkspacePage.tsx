@@ -1,17 +1,18 @@
 import PromptComposer from '../components/PromptComposer'
-import RateLimitBanner from '../components/RateLimitBanner'
+// import RateLimitBanner from '../components/RateLimitBanner'
 import Sidebar, { type AppPage } from '../components/Sidebar'
 import SuggestionGrid from '../components/SuggestionGrid'
 import TopAppBar from '../components/TopAppBar'
 
 type WorkspacePageProps = {
+  activePage: AppPage
   onNavigate: (page: AppPage) => void
 }
 
-function WorkspacePage({ onNavigate }: WorkspacePageProps) {
+function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
   return (
     <div className="workspace-app">
-      <Sidebar activePage="workspace" onNavigate={onNavigate} />
+      <Sidebar activePage={activePage} onNavigate={onNavigate} />
 
       <main className="workspace-main">
         <TopAppBar />
@@ -20,7 +21,7 @@ function WorkspacePage({ onNavigate }: WorkspacePageProps) {
           <h1>What should we build in Foxy?</h1>
 
           <div className="workspace-main__controls">
-            <RateLimitBanner />
+            {/* <RateLimitBanner /> */}
             <PromptComposer />
           </div>
 

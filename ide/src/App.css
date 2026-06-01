@@ -145,8 +145,39 @@ button {
 }
 
 .sidebar__footer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   border-top: 1px solid var(--outline-variant);
   padding: 16px;
+}
+
+.market-hero__cta {
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #000000;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  margin: 24px 0 0;
+  padding: 10px 16px;
+  transition:
+    background 180ms ease,
+    transform 180ms ease;
+}
+
+.market-hero__cta:hover {
+  background: #f3f3f3;
+}
+
+.market-hero__cta:active {
+  transform: scale(0.98);
 }
 
 .workspace-main {
@@ -1071,21 +1102,21 @@ button {
 
 .agent-card__actions button {
   flex: 1;
-  border: 0;
+  border: 1px solid color-mix(in srgb, var(--outline-variant) 70%, transparent);
   border-radius: 8px;
-  background: var(--secondary-container);
-  color: #ffffff;
+  background: var(--surface-container-high);
+  color: var(--on-surface);
   font-size: 14px;
   font-weight: 600;
-  line-height: 20px;
-  padding: 10px 14px;
+  padding: 10px 18px;
   transition:
     background 180ms ease,
-    transform 180ms ease;
+    color 180ms ease;
 }
 
 .agent-card__actions button:hover {
-  background: color-mix(in srgb, var(--secondary-container) 84%, white);
+  background: var(--surface-container-highest);
+  color: var(--primary);
 }
 
 .agent-card__actions a {
@@ -1298,7 +1329,7 @@ button {
   border-color: var(--outline-variant);
   border-radius: 999px;
   background: var(--surface-container);
-  color: var(--on-surface-variant);
+  color: #ffffff;
   font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 500;
@@ -1311,14 +1342,14 @@ button {
 .market-chip:hover {
   border-color: var(--primary);
   background: var(--surface-container);
-  color: var(--on-surface);
+  color: #ffffff;
 }
 
 .market-chip--active,
 .market-chip--active:hover {
   border-color: var(--primary);
   background: var(--primary);
-  color: var(--on-primary);
+  color: #000000;
 }
 
 .market-sections {
