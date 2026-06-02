@@ -1,17 +1,14 @@
-from uuid import UUID
+from .base_repository import BaseRepository
 
 
-class ProjectDB:
-    def __init__(self, db):
-        self.db = db
+class ProjectRepository(BaseRepository):
 
-
-    def create_project(
+    async def create_project(
         self,
         conn,
-        user_id: UUID,
+        user_id: str,
         name: str,
-        description: str | None,
+        description: str | None
     ):
         query = """
         INSERT INTO projects (
@@ -19,59 +16,47 @@ class ProjectDB:
             name,
             description
         )
-        VALUES (%s, %s, %s)
-        RETURNING id, user_id, name, description, status, created_at;
-        """
-
-        with conn.cursor() as cur:
-            cur.execute(
-                query,
-                (
-                    str(user_id),
-                    name,
-                    description,
-                ),
-            )
-
-            row = cur.fetchone()
-
-        return {
-            "id": row[0],
-            "user_id": row[1],
-            "name": row[2],
-            "description": row[3],
-            "status": row[4],
-            "created_at": row[5],
-        }
-
-
-    def get_project_by_id(self, conn, project_id: UUID):
-        query = """
-        SELECT
+        VALUES (
+            $1,
+            $2,
+            $3
+        )
+        RETURNING
             id,
             user_id,
             name,
             description,
             status,
             created_at,
-            updated_at
-        FROM projects
-        WHERE id = %s
+            updated_at;
         """
 
-        with conn.cursor() as cur:
-            cur.execute(query, (str(project_id),))
-            row = cur.fetchone()
+        row = await conn.fetchrow(
+            query,
+            user_id,
+            name,
+            description
+        )
+
+        return dict(row)
+
+    async def get_project_by_id(
+        self,
+        conn,
+        project_id: str
+    ):
+        query = """
+        SELECT *
+        FROM projects
+        WHERE id = $1
+        """
+
+        row = await conn.fetchrow(
+            query,
+            project_id
+        )
 
         if not row:
             return None
 
-        return {
-            "id": row[0],
-            "user_id": row[1],
-            "name": row[2],
-            "description": row[3],
-            "status": row[4],
-            "created_at": row[5],
-            "updated_at": row[6],
-        }
+        return dict(row)
