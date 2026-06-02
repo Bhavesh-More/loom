@@ -64,3 +64,23 @@ class ProjectRepository:
             return None
 
         return dict(row)
+
+
+    async def get_projects(
+        self,
+        conn,
+        user_id: str
+    ):
+        query = """
+        SELECT *
+        FROM projects
+        WHERE user_id = $1
+        ORDER BY created_at DESC
+        """
+
+        rows = await conn.fetch(
+            query,
+            user_id
+        )
+
+        return [dict(row) for row in rows]

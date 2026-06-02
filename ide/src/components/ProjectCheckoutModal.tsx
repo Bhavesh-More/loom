@@ -9,12 +9,14 @@ type ProjectCheckoutModalProps = {
   agents: AgentCardData[]
   onClose: () => void
   onRemoveAgent: (agentName: string) => void
+  onSuccess?: () => void
 }
 
 function ProjectCheckoutModal({
   agents,
   onClose,
   onRemoveAgent,
+  onSuccess,
 }: ProjectCheckoutModalProps) {
   const [projectPath, setProjectPath] = useState('')
   const [projectName, setProjectName] = useState('')
@@ -50,7 +52,12 @@ function ProjectCheckoutModal({
         throw new Error(errorText || 'Failed to create project')
       }
 
-      onClose()
+      if (onSuccess) {
+        onSuccess()
+      } else {
+        onClose()
+      }
+      window.dispatchEvent(new CustomEvent('project-created'))
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : 'Failed to create project')
     } finally {

@@ -28,3 +28,9 @@ async def get_project(project_id: UUID):
         raise HTTPException(status_code=404, detail="Project not found")
 
     return project
+
+
+@router.post("/get-projects")
+async def get_projects():
+    projects = await project_service.get_projects()
+    return projects

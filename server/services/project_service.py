@@ -70,6 +70,18 @@ class ProjectService:
             await self.db.release_conn(conn)
 
 
+    async def get_projects(self):
+        conn = await self.db.get_conn()
+
+        try:
+            return await self.project_repository.get_projects(
+                conn=conn,
+                user_id=DEV_USER_ID
+            )
+        finally:
+            await self.db.release_conn(conn)
+
+
     async def _create_workspace(
         self,
         project_id: str

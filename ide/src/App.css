@@ -2351,3 +2351,18 @@ button {
     flex-direction: column-reverse;
   }
 }
+
+/* Custom Scrollbar for Marketplace */
+.marketplace-main::-webkit-scrollbar {
+  width: 8px;
+}
+.marketplace-main::-webkit-scrollbar-track {
+  background: transparent;
+}
+.marketplace-main::-webkit-scrollbar-thumb {
+  background: var(--outline-variant, #49454f);
+  border-radius: 4px;
+}
+.marketplace-main::-webkit-scrollbar-thumb:hover {
+  background: var(--outline, #938f99);
+}
