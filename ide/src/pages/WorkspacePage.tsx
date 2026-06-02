@@ -3,7 +3,7 @@ import PromptComposer from '../components/PromptComposer'
 import Sidebar, { type AppPage } from '../components/Sidebar'
 import SuggestionGrid from '../components/SuggestionGrid'
 import TopAppBar from '../components/TopAppBar'
-import { developProjectStream } from '../lib/projects'
+import { developProjectStream, getChatDetail, type ChatMessage } from '../lib/projects'
 
 type WorkspacePageProps = {
   activePage: AppPage
@@ -53,10 +53,115 @@ function getFileColorClass(filename: string): string {
   return 'text-on-surface-variant'
 }
 
+function reconstructSessionFromMessages(sessionData: any, messages: ChatMessage[]): ChatSession {
+  // 1. Get user prompt from messages
+  const userMsg = messages.find(m => m.role === 'user' && m.message_type === 'text')
+  const prompt = userMsg?.content?.text || sessionData.title || ''
+
+  // 2. Get project name from messages or fallback
+  const startMsg = messages.find(m => m.role === 'system' && m.message_type === 'system_event' && m.content?.project_name)
+  const projectName = startMsg?.content?.project_name || ''
+
+  // 3. Process steps
+  let steps: ExecutionStep[] = []
+  
+  // Find task plan if it exists
+  const planMsg = messages.find(m => m.message_type === 'task_plan')
+  if (planMsg && planMsg.content?.plan) {
+    steps = planMsg.content.plan.map((step: any, idx: number) => ({
+      step: step.step || idx + 1,
+      agent: step.agent || 'Unknown',
+      task: step.task || '',
+      status: 'pending',
+      files: [],
+    }))
+  }
+
+  // Apply agent execution updates
+  const executionMsgs = messages.filter(m => m.message_type === 'agent_execution')
+  executionMsgs.forEach(m => {
+    const completedIdx = m.content?.completed_step_idx
+    if (completedIdx !== undefined && steps[completedIdx]) {
+      const stepErrors = m.content?.errors || []
+      steps[completedIdx].status = stepErrors.length > 0 ? 'failed' : 'completed'
+      steps[completedIdx].files = m.content?.files || []
+    }
+  })
+
+  // 4. Get workspace path
+  const fileWriterMsg = messages.find(m => m.message_type === 'system_event' && m.content?.workspace_path)
+  const workspacePath = fileWriterMsg?.content?.workspace_path || ''
+
+  // 5. Gather all errors
+  const errors: string[] = []
+  messages.forEach(m => {
+    if (m.content?.errors) {
+      errors.push(...m.content.errors)
+    }
+  })
+
+  // 6. Status of the session
+  let status: ChatSession['status'] = 'completed'
+  // If there's an error message or the execution failed, mark failed
+  const errorMsg = messages.find(m => m.message_type === 'system_event' && m.content?.text?.includes('failed'))
+  if (errorMsg || errors.length > 0) {
+    status = 'failed'
+  }
+
+  // 7. Calculate elapsed time if possible
+  let elapsedTime = 0
+  if (messages.length > 1) {
+    const firstTime = new Date(messages[0].created_at).getTime()
+    const lastTime = new Date(messages[messages.length - 1].created_at).getTime()
+    elapsedTime = Math.max(0, Math.floor((lastTime - firstTime) / 1000))
+  }
+
+  return {
+    prompt,
+    projectName,
+    status,
+    steps,
+    elapsedTime,
+    workspacePath,
+    errors,
+  }
+}
+
 function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
   const [activeSession, setActiveSession] = useState<ChatSession | null>(null)
+  const [activeChatId, setActiveChatId] = useState<string | null>(null)
   const [followUpText, setFollowUpText] = useState('')
   const timerRef = useRef<number | null>(null)
+
+  const handleSelectChat = async (chatId: string) => {
+    setActiveChatId(chatId)
+    // Create a temporary loading state
+    setActiveSession({
+      prompt: 'Loading chat session...',
+      projectName: '',
+      status: 'planning',
+      steps: [],
+      elapsedTime: 0,
+      workspacePath: '',
+      errors: [],
+    })
+    try {
+      const chatDetail = await getChatDetail(chatId)
+      const reconstructed = reconstructSessionFromMessages(chatDetail.session, chatDetail.messages)
+      setActiveSession(reconstructed)
+    } catch (err: any) {
+      console.error("Failed to load chat details", err)
+      setActiveSession({
+        prompt: 'Error loading chat',
+        projectName: '',
+        status: 'failed',
+        steps: [],
+        elapsedTime: 0,
+        workspacePath: '',
+        errors: [`Failed to retrieve chat history: ${err.message || 'Unknown error'}`],
+      })
+    }
+  }
 
   // Start incrementing timer when session is running
   useEffect(() => {
@@ -88,6 +193,7 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
   }, [activeSession?.status])
 
   const handleSendPrompt = async (projectId: string, promptText: string) => {
+    setActiveChatId(null)
     const newSession: ChatSession = {
       prompt: promptText,
       projectName: '',
@@ -101,6 +207,17 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
 
     try {
       await developProjectStream(projectId, promptText, (chunk) => {
+        if (chunk.type === 'start') {
+          if (chunk.chat_id) {
+            setActiveChatId(chunk.chat_id)
+          }
+          window.dispatchEvent(new CustomEvent('chat-created'))
+        } else if (chunk.type === 'complete' || chunk.type === 'error') {
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('chat-created'))
+          }, 200)
+        }
+
         setActiveSession((curr) => {
           if (!curr) return null
           
@@ -171,7 +288,18 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
   return (
     <div className="h-screen w-full flex overflow-hidden bg-background">
       {/* Sidebar Component */}
-      <Sidebar activePage={activePage} onNavigate={onNavigate} />
+      <Sidebar 
+        activePage={activePage} 
+        onNavigate={(page) => {
+          if (page === 'chat') {
+            setActiveSession(null)
+            setActiveChatId(null)
+          }
+          onNavigate(page)
+        }} 
+        activeChatId={activeChatId}
+        onSelectChat={handleSelectChat}
+      />
 
       {/* Main Content Pane */}
       <main className="flex-1 flex flex-col h-full bg-[#000000] relative overflow-hidden">

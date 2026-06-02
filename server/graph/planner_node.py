@@ -32,7 +32,7 @@ def planner_node(state: LoomState) -> LoomState:
 
     llm = ChatGroq(
         model="qwen/qwen3-32b",
-        api_key=os.environ.get("GROQ_API_KEY"),
+        api_key=os.environ.get("GROQ_API_KEY_1"),
         temperature=0.6,
         max_tokens=4096,
     )

@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException
 
 from db.schema.project import CreateProjectRequest, CreateProjectResponse
 from dependencies.project_dep import project_service
+from db.chat import ChatRepository
 
 router = APIRouter(
     prefix="/projects",
@@ -74,10 +75,14 @@ class DevelopProjectRequest(BaseModel):
     project_id: UUID
     prompt: str
 
+chat_repository = ChatRepository(database)
+
 @router.post("/develop")
 async def develop_project(request: DevelopProjectRequest):
     async def event_generator():
         conn = await database.get_conn()
+        messages_to_insert = []
+        chat_session_id = None
         try:
             # 1. Fetch project by ID
             project = await project_service.project_repository.get_project_by_id(conn, str(request.project_id))
@@ -109,6 +114,28 @@ async def develop_project(request: DevelopProjectRequest):
                 yield json.dumps({"type": "error", "message": "Assigned agents could not be mapped to Loom execution keys."}) + "\n"
                 return
 
+            # Create a chat session in the DB
+            chat_session = await chat_repository.create_chat_session(conn, str(request.project_id), request.prompt)
+            chat_session_id = chat_session["id"]
+
+            # Initialize messages buffer with user prompt and starting event
+            messages_to_insert.append({
+                "session_id": chat_session_id,
+                "role": "user",
+                "message_type": "text",
+                "content": {"text": request.prompt}
+            })
+
+            messages_to_insert.append({
+                "session_id": chat_session_id,
+                "role": "system",
+                "message_type": "system_event",
+                "content": {
+                    "text": "Starting developer workflow...",
+                    "project_name": project["name"]
+                }
+            })
+
             # 4. Invoke the orchestrator using those agents
             initial_state = {
                 "project_id": str(request.project_id),
@@ -122,7 +149,13 @@ async def develop_project(request: DevelopProjectRequest):
                 "errors": []
             }
 
-            yield json.dumps({"type": "start", "message": "Starting developer workflow...", "project_name": project["name"]}) + "\n"
+            yield json.dumps({
+                "type": "start",
+                "message": "Starting developer workflow...",
+                "project_name": project["name"],
+                "chat_id": str(chat_session_id),
+                "chat_title": chat_session["title"]
+            }) + "\n"
 
             plan = []
             async for event in loom_graph.astream(initial_state, stream_mode="updates"):
@@ -132,6 +165,16 @@ async def develop_project(request: DevelopProjectRequest):
 
                 if node_name == "planner":
                     plan = state_update.get("execution_plan", [])
+                    messages_to_insert.append({
+                        "session_id": chat_session_id,
+                        "role": "system",
+                        "message_type": "task_plan",
+                        "content": {
+                            "text": f"Generated plan with {len(plan)} steps.",
+                            "plan": plan,
+                            "errors": errors
+                        }
+                    })
                     yield json.dumps({
                         "type": "planner",
                         "message": f"Generated plan with {len(plan)} steps.",
@@ -161,6 +204,19 @@ async def develop_project(request: DevelopProjectRequest):
                         parsed_files = parse_agent_output(agent_raw_output)
                         files_written = list(parsed_files.keys())
 
+                    messages_to_insert.append({
+                        "session_id": chat_session_id,
+                        "role": "system",
+                        "message_type": "agent_execution",
+                        "content": {
+                            "text": f"Step {current_step} completed.",
+                            "completed_step_idx": completed_step_idx,
+                            "agent": agent_name,
+                            "task": task,
+                            "files": files_written,
+                            "errors": errors
+                        }
+                    })
                     yield json.dumps({
                         "type": "executor",
                         "message": f"Step {current_step} completed.",
@@ -172,6 +228,16 @@ async def develop_project(request: DevelopProjectRequest):
                     }) + "\n"
                 elif node_name == "file_writer":
                     workspace_path = state_update.get("workspace_path", "")
+                    messages_to_insert.append({
+                        "session_id": chat_session_id,
+                        "role": "system",
+                        "message_type": "system_event",
+                        "content": {
+                            "text": "Writing outputs to disk.",
+                            "workspace_path": workspace_path,
+                            "errors": errors
+                        }
+                    })
                     yield json.dumps({
                         "type": "file_writer",
                         "message": "Writing outputs to disk.",
@@ -179,11 +245,33 @@ async def develop_project(request: DevelopProjectRequest):
                         "errors": errors
                     }) + "\n"
 
+            messages_to_insert.append({
+                "session_id": chat_session_id,
+                "role": "system",
+                "message_type": "system_event",
+                "content": {
+                    "text": "Development complete."
+                }
+            })
             yield json.dumps({"type": "complete", "message": "Development complete."}) + "\n"
 
         except Exception as e:
+            if chat_session_id:
+                messages_to_insert.append({
+                    "session_id": chat_session_id,
+                    "role": "system",
+                    "message_type": "system_event",
+                    "content": {
+                        "text": f"LangGraph execution failed: {str(e)}"
+                    }
+                })
             yield json.dumps({"type": "error", "message": f"LangGraph execution failed: {str(e)}"}) + "\n"
         finally:
+            if chat_session_id and messages_to_insert:
+                try:
+                    await chat_repository.create_chat_messages(conn, messages_to_insert)
+                except Exception as db_err:
+                    print(f"Failed to log chat messages: {db_err}")
             await database.release_conn(conn)
 
     return StreamingResponse(event_generator(), media_type="application/x-ndjson")

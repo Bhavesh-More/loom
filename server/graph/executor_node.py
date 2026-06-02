@@ -58,7 +58,7 @@ Generate the code now.
 
     llm = ChatGroq(
         model="llama-3.3-70b-versatile",
-        api_key=os.environ.get("GROQ_API_KEY"),
+        api_key=os.environ.get("GROQ_API_KEY_1"),
         temperature=0.2,
         max_tokens=8192,
     )
