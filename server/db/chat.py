@@ -91,3 +91,47 @@ class ChatRepository:
                 msg["message_type"],
                 content
             )
+
+    async def get_chat_session(
+        self,
+        conn,
+        session_id: str
+    ):
+        """
+        Returns a single chat session metadata by ID.
+        """
+        query = """
+        SELECT id, project_id, title, created_at, updated_at
+        FROM chat_sessions
+        WHERE id = $1
+        """
+        row = await conn.fetchrow(query, session_id)
+        return dict(row) if row else None
+
+    async def get_chat_messages(
+        self,
+        conn,
+        session_id: str
+    ):
+        """
+        Returns all messages in a chat session ordered by creation time.
+        """
+        query = """
+        SELECT id, session_id, role, message_type, content, created_at
+        FROM chat_messages
+        WHERE session_id = $1
+        ORDER BY created_at ASC
+        """
+        rows = await conn.fetch(query, session_id)
+        res = []
+        for r in rows:
+            d = dict(r)
+            # If the database returns the JSONB column as a string (rare with asyncpg, but safe), parse it.
+            if isinstance(d["content"], str):
+                try:
+                    d["content"] = json.loads(d["content"])
+                except Exception:
+                    pass
+            res.append(d)
+        return res
+

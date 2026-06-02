@@ -99,6 +99,33 @@ export async function getChats(forceRefresh = false): Promise<Chat[]> {
   return chatsFetchPromise
 }
 
+export type ChatMessage = {
+  id: string
+  session_id: string
+  role: 'user' | 'assistant' | 'agent' | 'system'
+  message_type: 'text' | 'agent_execution' | 'task_plan' | 'system_event'
+  content: any
+  created_at: string
+}
+
+export type ChatDetail = {
+  session: Chat
+  messages: ChatMessage[]
+}
+
+export async function getChatDetail(sessionId: string): Promise<ChatDetail> {
+  const response = await fetch(`${API_BASE_URL.replace(/\/$/, '')}/chats/get-chat/${sessionId}`, {
+    method: 'GET',
+  })
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch chat details')
+  }
+
+  return response.json()
+}
+
+
 export async function developProject(projectId: string, prompt: string): Promise<any> {
   const response = await fetch(`${API_BASE_URL.replace(/\/$/, '')}/projects/develop`, {
     method: 'POST',

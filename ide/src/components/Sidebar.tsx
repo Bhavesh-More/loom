@@ -6,9 +6,11 @@ export type AppPage = 'chat' | 'marketplace'
 type SidebarProps = {
   activePage: AppPage
   onNavigate: (page: AppPage) => void
+  activeChatId?: string | null
+  onSelectChat?: (chatId: string) => void
 }
 
-function Sidebar({ activePage, onNavigate }: SidebarProps) {
+function Sidebar({ activePage, onNavigate, activeChatId, onSelectChat }: SidebarProps) {
   const [projects, setProjects] = useState<Project[]>([])
   const [chats, setChats] = useState<Chat[]>([])
 
@@ -80,9 +82,9 @@ function Sidebar({ activePage, onNavigate }: SidebarProps) {
           <>
             {/* New Chat */}
             <button
-              aria-current={activePage === 'chat' ? 'page' : undefined}
+              aria-current={(activePage === 'chat' && !activeChatId) ? 'page' : undefined}
               className={`flex items-center gap-3 px-4 py-2 font-body-sm text-body-sm transition-all text-left w-full ${
-                activePage === 'chat'
+                (activePage === 'chat' && !activeChatId)
                   ? 'text-primary dark:text-primary border-l-2 border-primary bg-surface-container-high dark:bg-surface-container-highest'
                   : 'text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary hover:bg-surface-container-highest dark:hover:bg-surface-container-high'
               }`}
@@ -156,17 +158,30 @@ function Sidebar({ activePage, onNavigate }: SidebarProps) {
             </div>
 
             {chats.length > 0 ? (
-              chats.map((chat) => (
-                <a
-                  className="flex items-center gap-3 text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary px-4 py-2 transition-all font-body-sm text-body-sm hover:bg-surface-container-highest dark:hover:bg-surface-container-high"
-                  href="#"
-                  key={chat.id}
-                  title={chat.title}
-                >
-                  <span className="material-symbols-outlined text-[18px] opacity-70">chat</span>
-                  <span className="truncate">{chat.title}</span>
-                </a>
-              ))
+              chats.map((chat) => {
+                const isActive = activeChatId === chat.id
+                return (
+                  <button
+                    className={`flex items-center gap-3 px-4 py-2 font-body-sm text-body-sm transition-all text-left w-full ${
+                      isActive
+                        ? 'text-primary dark:text-primary border-l-2 border-primary bg-surface-container-high dark:bg-surface-container-highest font-medium'
+                        : 'text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary hover:bg-surface-container-highest dark:hover:bg-surface-container-high'
+                    }`}
+                    onClick={() => {
+                      onNavigate('chat')
+                      if (onSelectChat) {
+                        onSelectChat(chat.id)
+                      }
+                    }}
+                    type="button"
+                    key={chat.id}
+                    title={chat.title}
+                  >
+                    <span className="material-symbols-outlined text-[18px] opacity-70">chat</span>
+                    <span className="truncate">{chat.title}</span>
+                  </button>
+                )
+              })
             ) : (
               <span className="px-4 py-1.5 text-[12px] text-on-surface-variant italic">
                 No chats yet
