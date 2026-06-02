@@ -207,3 +207,59 @@ export async function developProjectStream(
     }
   }
 }
+
+// ── Workspace ──────────────────────────────────────────────────────────────
+
+export type FileTreeNode = {
+  name: string
+  path: string
+  type: 'file' | 'directory'
+  children?: FileTreeNode[]
+}
+
+export type FileContentResponse = {
+  path: string
+  content: string
+}
+
+export async function getWorkspaceTree(projectId: string): Promise<FileTreeNode[]> {
+  const response = await fetch(`${API_BASE_URL.replace(/\/$/, '')}/workspace/${projectId}/tree`, {
+    method: 'GET',
+  })
+  if (!response.ok) {
+    throw new Error('Failed to fetch workspace tree')
+  }
+  return response.json()
+}
+
+export async function getFileContent(projectId: string, path: string): Promise<FileContentResponse> {
+  const encodedPath = encodeURIComponent(path)
+  const response = await fetch(`${API_BASE_URL.replace(/\/$/, '')}/workspace/${projectId}/file?path=${encodedPath}`, {
+    method: 'GET',
+  })
+  if (!response.ok) {
+    throw new Error('Failed to fetch file content')
+  }
+  return response.json()
+}
+
+export async function saveFileContent(projectId: string, path: string, content: string): Promise<any> {
+  const response = await fetch(`${API_BASE_URL.replace(/\/$/, '')}/workspace/${projectId}/file`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      path,
+      content,
+    }),
+  })
+  if (!response.ok) {
+    throw new Error('Failed to save file content')
+  }
+  return response.json()
+}
+
+export function getDownloadUrl(projectId: string): string {
+  return `${API_BASE_URL.replace(/\/$/, '')}/workspace/${projectId}/download`
+}
