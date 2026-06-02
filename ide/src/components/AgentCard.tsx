@@ -1,6 +1,7 @@
 import MaterialIcon from './MaterialIcon'
 
 export type AgentCardData = {
+  id: string
   name: string
   version: string
   type: 'Core' | 'Community'

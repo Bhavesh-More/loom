@@ -1,7 +1,10 @@
-from .base_repository import BaseRepository
+from db.database import Database
 
 
-class ProjectAgentRepository(BaseRepository):
+class ProjectAgentRepository:
+    def __init__(self, db: Database):
+        self.db = db
+
 
     async def add_agents(
         self,
@@ -27,6 +30,7 @@ class ProjectAgentRepository(BaseRepository):
                 for agent_id in agent_ids
             ]
         )
+
 
     async def get_project_agents(
         self,

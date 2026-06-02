@@ -3,22 +3,67 @@ import { useState } from 'react'
 import type { AgentCardData } from './AgentCard'
 import MaterialIcon from './MaterialIcon'
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
+
 type ProjectCheckoutModalProps = {
   agents: AgentCardData[]
   onClose: () => void
   onRemoveAgent: (agentName: string) => void
+  onSuccess?: () => void
 }
 
 function ProjectCheckoutModal({
   agents,
   onClose,
   onRemoveAgent,
+  onSuccess,
 }: ProjectCheckoutModalProps) {
   const [projectPath, setProjectPath] = useState('')
   const [projectName, setProjectName] = useState('')
   const [projectDescription, setProjectDescription] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
 
   const isCreateEnabled = projectName.trim().length > 0 && projectDescription.trim().length > 0
+
+  const handleCreateProject = async () => {
+    if (!isCreateEnabled || isSubmitting) {
+      return
+    }
+
+    setIsSubmitting(true)
+    setSubmitError('')
+
+    try {
+      const response = await fetch(`${API_BASE_URL.replace(/\/$/, '')}/projects`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: projectName.trim(),
+          description: projectDescription.trim(),
+          agent_ids: agents.map((agent) => agent.id),
+        }),
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(errorText || 'Failed to create project')
+      }
+
+      if (onSuccess) {
+        onSuccess()
+      } else {
+        onClose()
+      }
+      window.dispatchEvent(new CustomEvent('project-created'))
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Failed to create project')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   return (
     <div className="checkout-modal" role="presentation">
@@ -47,7 +92,13 @@ function ProjectCheckoutModal({
           ))}
         </div>
 
-        <form className="checkout-form" onSubmit={(e) => e.preventDefault()}>
+        <form
+          className="checkout-form"
+          onSubmit={(e) => {
+            e.preventDefault()
+            void handleCreateProject()
+          }}
+        >
           <label>
             <span>Project name<span className="required"> *</span></span>
             <input
@@ -84,10 +135,12 @@ function ProjectCheckoutModal({
             <button type="button" onClick={onClose}>
               Cancel
             </button>
-            <button type="button" disabled={!isCreateEnabled} aria-disabled={!isCreateEnabled}>
-              Create Project
+            <button type="submit" disabled={!isCreateEnabled || isSubmitting} aria-disabled={!isCreateEnabled || isSubmitting}>
+              {isSubmitting ? 'Creating...' : 'Create Project'}
             </button>
           </div>
+
+          {submitError ? <p className="checkout-form__error">{submitError}</p> : null}
         </form>
       </div>
     </div>

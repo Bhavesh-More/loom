@@ -1,10 +1,9 @@
 from pathlib import Path
 
-from config.constants import DEV_USER_ID
+from config.contant import DEV_USER_ID
 
 
 class ProjectService:
-
     def __init__(
         self,
         db,
@@ -14,6 +13,7 @@ class ProjectService:
         self.db = db
         self.project_repository = project_repository
         self.project_agent_repository = project_agent_repository
+
 
     async def create_project(
         self,
@@ -53,6 +53,34 @@ class ProjectService:
 
         finally:
             await self.db.release_conn(conn)
+
+
+    async def get_project(
+        self,
+        project_id: str
+    ):
+        conn = await self.db.get_conn()
+
+        try:
+            return await self.project_repository.get_project_by_id(
+                conn=conn,
+                project_id=project_id
+            )
+        finally:
+            await self.db.release_conn(conn)
+
+
+    async def get_projects(self):
+        conn = await self.db.get_conn()
+
+        try:
+            return await self.project_repository.get_projects(
+                conn=conn,
+                user_id=DEV_USER_ID
+            )
+        finally:
+            await self.db.release_conn(conn)
+
 
     async def _create_workspace(
         self,

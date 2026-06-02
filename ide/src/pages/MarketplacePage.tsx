@@ -53,6 +53,10 @@ function MarketplacePage({ onNavigate }: MarketplacePageProps) {
         <ProjectCheckoutModal
           agents={selectedAgents}
           onClose={() => setIsCheckoutOpen(false)}
+          onSuccess={() => {
+            setIsCheckoutOpen(false)
+            setSelectedAgents([])
+          }}
           onRemoveAgent={handleRemoveFromTeam}
         />
       ) : null}

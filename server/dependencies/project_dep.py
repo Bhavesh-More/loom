@@ -1,16 +1,10 @@
 from db.database import database
 
-from db.project import (
-    ProjectRepository
-)
+from db.project import ProjectRepository
 
-from db.project_agent import (
-    ProjectAgentRepository
-)
+from db.project_agent import ProjectAgentRepository
 
-from services.project_service import (
-    ProjectService
-)
+from services.project_service import ProjectService
 
 project_repository = ProjectRepository(
     database

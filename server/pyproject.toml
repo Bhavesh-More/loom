@@ -11,4 +11,5 @@ dependencies = [
     "langchain-groq>=1.1.2",
     "langgraph>=1.2.3",
     "psycopg2>=2.9.12",
+    "uvicorn>=0.48.0",
 ]

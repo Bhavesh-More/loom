@@ -471,6 +471,29 @@ button {
   transition: color 180ms ease;
 }
 
+.context-chip--select {
+  min-width: 0;
+}
+
+.context-chip__select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  min-width: 0;
+  max-width: 220px;
+  outline: none;
+  padding: 0;
+}
+
+.context-chip__select:focus-visible {
+  color: var(--on-surface);
+}
+
 .context-chip:hover {
   color: var(--on-surface);
 }
@@ -2350,4 +2373,19 @@ button {
   .checkout-form__actions {
     flex-direction: column-reverse;
   }
+}
+
+/* Custom Scrollbar for Marketplace */
+.marketplace-main::-webkit-scrollbar {
+  width: 8px;
+}
+.marketplace-main::-webkit-scrollbar-track {
+  background: transparent;
+}
+.marketplace-main::-webkit-scrollbar-thumb {
+  background: var(--outline-variant, #49454f);
+  border-radius: 4px;
+}
+.marketplace-main::-webkit-scrollbar-thumb:hover {
+  background: var(--outline, #938f99);
 }

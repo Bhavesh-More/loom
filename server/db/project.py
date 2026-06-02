@@ -1,7 +1,10 @@
-from .base_repository import BaseRepository
+from db.database import Database
 
 
-class ProjectRepository(BaseRepository):
+class ProjectRepository:
+    def __init__(self, db: Database):
+        self.db = db
+
 
     async def create_project(
         self,
@@ -40,6 +43,7 @@ class ProjectRepository(BaseRepository):
 
         return dict(row)
 
+
     async def get_project_by_id(
         self,
         conn,
@@ -60,3 +64,23 @@ class ProjectRepository(BaseRepository):
             return None
 
         return dict(row)
+
+
+    async def get_projects(
+        self,
+        conn,
+        user_id: str
+    ):
+        query = """
+        SELECT *
+        FROM projects
+        WHERE user_id = $1
+        ORDER BY created_at DESC
+        """
+
+        rows = await conn.fetch(
+            query,
+            user_id
+        )
+
+        return [dict(row) for row in rows]
