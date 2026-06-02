@@ -7,9 +7,9 @@ function RateLimitBanner() {
         <MaterialIcon name="speed" />
       </div>
       <div className="rate-limit__copy">
-        <p>You're out of Foxy messages</p>
+        <p>You're out of L00m messages</p>
         <span>
-          Your rate limit resets on 1 Jul 2026, 16:29. To continue using Foxy,
+          Your rate limit resets on 1 Jul 2026, 16:29. To continue using L00m,
           upgrade to Plus today.
         </span>
       </div>

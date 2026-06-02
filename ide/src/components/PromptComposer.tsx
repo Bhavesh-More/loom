@@ -2,7 +2,7 @@ import { type ChangeEvent, useRef, useState } from 'react'
 import MaterialIcon from './MaterialIcon'
 
 const contextItems = [
-  { label: 'foxy', icon: 'folder' },
+  { label: 'L00m', icon: 'folder' },
   { label: 'Work locally', icon: 'laptop_windows' },
   { label: 'main', icon: 'account_tree' },
 ]

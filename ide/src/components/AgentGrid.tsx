@@ -7,6 +7,7 @@ const INITIAL_VISIBLE_AGENTS = 12
 
 const agents: AgentCardData[] = [
   {
+    id: '204cfaf9-aa29-430f-9309-4a97e81e7791',
     name: 'FastAPI Agent',
     version: 'v1.0.0',
     type: 'Core',
@@ -19,6 +20,7 @@ const agents: AgentCardData[] = [
     installs: '12.4k',
   },
   {
+    id: 'ee1b6b17-a05d-4e4f-a313-cdae446f62c0',
     name: 'Streamlit Agent',
     version: 'v1.0.0',
     type: 'Core',
@@ -31,6 +33,7 @@ const agents: AgentCardData[] = [
     installs: '9.8k',
   },
   {
+    id: 'fdcc23b6-0106-459e-8b0e-29072d34b28c',
     name: 'MongoDB Agent',
     version: 'v1.0.0',
     type: 'Core',
@@ -43,6 +46,7 @@ const agents: AgentCardData[] = [
     installs: '15.2k',
   },
   {
+    id: 'ef209bcf-caca-43d8-9d4d-33c47af59141',
     name: 'PostgreSQL Agent',
     version: 'v1.0.0',
     type: 'Core',
@@ -55,6 +59,7 @@ const agents: AgentCardData[] = [
     installs: '11.5k',
   },
   {
+    id: '7f52aad5-5292-436e-a7a7-e7056f0361bd',
     name: 'Redis Agent',
     version: 'v1.0.0',
     type: 'Core',
@@ -67,6 +72,7 @@ const agents: AgentCardData[] = [
     installs: '7.3k',
   },
   {
+    id: '8ac481f3-a4e9-4d95-b065-4726e7c1d0f8',
     name: 'Supabase Agent',
     version: 'v1.0.0',
     type: 'Core',
@@ -79,6 +85,7 @@ const agents: AgentCardData[] = [
     installs: '3.2k',
   },
   {
+    id: 'ea173cc5-68ce-4711-9428-a09039e61e41',
     name: 'LangGraph Agent',
     version: 'v1.0.0',
     type: 'Core',
@@ -91,6 +98,7 @@ const agents: AgentCardData[] = [
     installs: '2.1k',
   },
   {
+    id: '4c38ec8e-b2b0-42c1-a78b-ded28fd14138',
     name: 'OpenAI Agent',
     version: 'v1.0.0',
     type: 'Core',
@@ -103,6 +111,7 @@ const agents: AgentCardData[] = [
     installs: '5.6k',
   },
   {
+    id: '9d4bd9f2-263e-4f88-80c0-a83cd556f9de',
     name: 'Docker Agent',
     version: 'v1.0.0',
     type: 'Core',
@@ -115,6 +124,7 @@ const agents: AgentCardData[] = [
     installs: '8.4k',
   },
   {
+    id: '00ac1046-fc5b-4c9b-a7a3-15f94545b1a2',
     name: 'GitHub Actions Agent',
     version: 'v1.0.0',
     type: 'Core',
@@ -127,6 +137,7 @@ const agents: AgentCardData[] = [
     installs: '6.1k',
   },
   {
+    id: '4cb0bc25-7486-4fc8-823b-cb2475f0fdd5',
     name: 'Authentication Agent',
     version: 'v1.0.0',
     type: 'Core',
@@ -139,6 +150,7 @@ const agents: AgentCardData[] = [
     installs: '13.7k',
   },
   {
+    id: '99fb18b4-39b7-4b9f-848f-ec8c8e1c17b0',
     name: 'RAG Agent',
     version: 'v1.0.0',
     type: 'Core',
@@ -151,6 +163,7 @@ const agents: AgentCardData[] = [
     installs: '10.2k',
   },
   {
+    id: 'fb64a956-f8af-43f9-b6c8-c3b46626ee8a',
     name: 'Pytest Agent',
     version: 'v1.0.0',
     type: 'Core',
@@ -163,6 +176,7 @@ const agents: AgentCardData[] = [
     installs: '5.6k',
   },
   {
+    id: '1f4ddc23-02c6-4e4a-8ca9-4b09bb37f198',
     name: 'Web Scraping Agent',
     version: 'v1.0.0',
     type: 'Core',

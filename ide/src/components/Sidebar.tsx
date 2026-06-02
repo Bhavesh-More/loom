@@ -12,7 +12,7 @@ const primaryNav = [
   { label: 'Marketplace', icon: 'search', page: 'marketplace' as const },
 ]
 
-const projects = [{ label: 'foxy', icon: 'folder_open' }]
+const projects = [{ label: 'L00m', icon: 'folder_open' }]
 
 function Sidebar({ activePage, onNavigate }: SidebarProps) {
   return (

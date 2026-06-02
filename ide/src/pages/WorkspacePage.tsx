@@ -18,7 +18,7 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
         <TopAppBar />
 
         <div className="workspace-main__content">
-          <h1>What should we build in Foxy?</h1>
+          <h1>What should we build in L00m?</h1>
 
           <div className="workspace-main__controls">
             {/* <RateLimitBanner /> */}

@@ -1,7 +1,10 @@
-from .base_repository import BaseRepository
+from db.database import Database
 
 
-class ProjectRepository(BaseRepository):
+class ProjectRepository:
+    def __init__(self, db: Database):
+        self.db = db
+
 
     async def create_project(
         self,
@@ -39,6 +42,7 @@ class ProjectRepository(BaseRepository):
         )
 
         return dict(row)
+
 
     async def get_project_by_id(
         self,
