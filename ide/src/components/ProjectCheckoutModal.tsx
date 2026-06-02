@@ -15,6 +15,10 @@ function ProjectCheckoutModal({
   onRemoveAgent,
 }: ProjectCheckoutModalProps) {
   const [projectPath, setProjectPath] = useState('')
+  const [projectName, setProjectName] = useState('')
+  const [projectDescription, setProjectDescription] = useState('')
+
+  const isCreateEnabled = projectName.trim().length > 0 && projectDescription.trim().length > 0
 
   return (
     <div className="checkout-modal" role="presentation">
@@ -43,17 +47,26 @@ function ProjectCheckoutModal({
           ))}
         </div>
 
-        <form className="checkout-form">
+        <form className="checkout-form" onSubmit={(e) => e.preventDefault()}>
           <label>
-            <span>Project name</span>
-            <input type="text" placeholder="Customer support automation" />
+            <span>Project name<span className="required"> *</span></span>
+            <input
+              type="text"
+              placeholder="Customer support automation"
+              value={projectName}
+              onChange={(e) => setProjectName(e.target.value)}
+              required
+            />
           </label>
 
           <label>
-            <span>Project description</span>
+            <span>Project description<span className="required"> *</span></span>
             <textarea
               rows={10}
               placeholder="Describe what this agent team should build, automate, or maintain."
+              value={projectDescription}
+              onChange={(e) => setProjectDescription(e.target.value)}
+              required
             />
           </label>
 
@@ -71,7 +84,9 @@ function ProjectCheckoutModal({
             <button type="button" onClick={onClose}>
               Cancel
             </button>
-            <button type="button">Create Project</button>
+            <button type="button" disabled={!isCreateEnabled} aria-disabled={!isCreateEnabled}>
+              Create Project
+            </button>
           </div>
         </form>
       </div>
