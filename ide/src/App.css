@@ -2214,6 +2214,12 @@ button {
   line-height: 18px;
 }
 
+.checkout-form label .required {
+  color: var(--secondary);
+  margin-right: 6px;
+  font-weight: 700;
+}
+
 .checkout-form input,
 .checkout-form textarea,
 .checkout-form select {
