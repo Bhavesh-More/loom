@@ -104,6 +104,7 @@ Stores user-created projects.
 
 - Many projects belong to one user.
 - One project can contain many agents.
+- One project can contain many chat sessions.
 
 ### Example Status Values
 
@@ -129,9 +130,11 @@ Join table connecting projects and agents.
 ### Example
 
 Project:
-- "Build SaaS Analytics Platform"
+
+- Build SaaS Analytics Platform
 
 Assigned Agents:
+
 - FastAPI Agent
 - PostgreSQL Agent
 - React Agent
@@ -139,15 +142,72 @@ Assigned Agents:
 
 ---
 
-# ER Diagram
+## chat_sessions
 
-users
-│
-├── agents
-│      └── agent_sources
-│
-└── projects
-       │
-       └── project_agents
-               │
-               └── agents
+Stores conversation threads inside a project.
+
+| Column | Type | Constraints |
+|----------|----------|----------|
+| id | UUID | PK |
+| project_id | UUID | FK → projects.id |
+| title | TEXT | NOT NULL |
+| created_at | TIMESTAMP | DEFAULT NOW() |
+| updated_at | TIMESTAMP | DEFAULT NOW() |
+
+### Relationships
+
+- Many chat sessions belong to one project.
+- One chat session contains many messages.
+
+### Example
+
+Project: AI Job Hunt OS
+
+Chats:
+
+- Initial Build
+- Resume Generator Feature
+- AWS Deployment
+- Bug Fixes
+
+---
+
+## chat_messages
+
+Stores all messages, plans, execution results, and system events within a chat session.
+
+| Column | Type | Constraints |
+|----------|----------|----------|
+| id | UUID | PK |
+| session_id | UUID | FK → chat_sessions.id |
+| role | TEXT | NOT NULL |
+| message_type | TEXT | NOT NULL |
+| content | JSONB | NOT NULL |
+| created_at | TIMESTAMP | DEFAULT NOW() |
+
+### Relationships
+
+- Many messages belong to one chat session.
+
+### Role Values
+
+- user
+- assistant
+- agent
+- system
+
+### Message Type Values
+
+- text
+- task_plan
+- agent_execution
+- system_event
+
+### Example Content
+
+#### User Message
+
+```json
+{
+  "text": "Build me a todo app"
+}

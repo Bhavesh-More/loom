@@ -101,6 +101,14 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
 
     try {
       await developProjectStream(projectId, promptText, (chunk) => {
+        if (chunk.type === 'start') {
+          window.dispatchEvent(new CustomEvent('chat-created'))
+        } else if (chunk.type === 'complete' || chunk.type === 'error') {
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('chat-created'))
+          }, 200)
+        }
+
         setActiveSession((curr) => {
           if (!curr) return null
           
@@ -171,7 +179,15 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
   return (
     <div className="h-screen w-full flex overflow-hidden bg-background">
       {/* Sidebar Component */}
-      <Sidebar activePage={activePage} onNavigate={onNavigate} />
+      <Sidebar 
+        activePage={activePage} 
+        onNavigate={(page) => {
+          if (page === 'chat') {
+            setActiveSession(null)
+          }
+          onNavigate(page)
+        }} 
+      />
 
       {/* Main Content Pane */}
       <main className="flex-1 flex flex-col h-full bg-[#000000] relative overflow-hidden">

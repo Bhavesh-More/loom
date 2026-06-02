@@ -47,6 +47,58 @@ export async function getProjects(forceRefresh = false): Promise<Project[]> {
   return projectsFetchPromise
 }
 
+// ── Chats ──────────────────────────────────────────────────────────────────
+
+export type Chat = {
+  id: string
+  title: string
+  project_id: string
+  created_at: string
+  updated_at: string
+}
+
+let cachedChats: Chat[] | null = null
+let chatsFetchPromise: Promise<Chat[]> | null = null
+
+export function invalidateChatsCache() {
+  cachedChats = null
+  chatsFetchPromise = null
+}
+
+export async function getChats(forceRefresh = false): Promise<Chat[]> {
+  if (forceRefresh) {
+    invalidateChatsCache()
+  }
+
+  if (cachedChats) {
+    return cachedChats
+  }
+
+  if (chatsFetchPromise) {
+    return chatsFetchPromise
+  }
+
+  chatsFetchPromise = (async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL.replace(/\/$/, '')}/chats/get-chats`, {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch chats')
+      }
+
+      const data: Chat[] = await response.json()
+      cachedChats = data
+      return data
+    } finally {
+      chatsFetchPromise = null
+    }
+  })()
+
+  return chatsFetchPromise
+}
+
 export async function developProject(projectId: string, prompt: string): Promise<any> {
   const response = await fetch(`${API_BASE_URL.replace(/\/$/, '')}/projects/develop`, {
     method: 'POST',
