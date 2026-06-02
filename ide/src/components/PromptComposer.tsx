@@ -1,8 +1,8 @@
-import { type ChangeEvent, useRef, useState } from 'react'
+import { type ChangeEvent, useEffect, useRef, useState } from 'react'
+import { getProjects, type Project } from '../lib/projects'
 import MaterialIcon from './MaterialIcon'
 
 const contextItems = [
-  { label: 'L00m', icon: 'folder' },
   { label: 'Work locally', icon: 'laptop_windows' },
   { label: 'main', icon: 'account_tree' },
 ]
@@ -10,6 +10,8 @@ const contextItems = [
 function PromptComposer() {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [prompt, setPrompt] = useState('')
+  const [projects, setProjects] = useState<Project[]>([])
+  const [selectedProjectId, setSelectedProjectId] = useState('')
 
   const handleChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
     setPrompt(event.target.value)
@@ -20,6 +22,43 @@ function PromptComposer() {
       textarea.style.height = `${textarea.scrollHeight}px`
     }
   }
+
+  useEffect(() => {
+    let active = true
+
+    async function loadProjects(force = false) {
+      try {
+        const data = await getProjects(force)
+        if (!active) {
+          return
+        }
+
+        setProjects(data)
+        setSelectedProjectId((currentProjectId) => {
+          if (data.some((project) => project.id === currentProjectId)) {
+            return currentProjectId
+          }
+
+          return data[0]?.id ?? ''
+        })
+      } catch (error) {
+        console.error('Failed to load composer projects', error)
+      }
+    }
+
+    void loadProjects()
+
+    const handleProjectCreated = () => {
+      void loadProjects(true)
+    }
+
+    window.addEventListener('project-created', handleProjectCreated)
+
+    return () => {
+      active = false
+      window.removeEventListener('project-created', handleProjectCreated)
+    }
+  }, [])
 
   return (
     <section className="composer" aria-label="Project prompt composer">
@@ -83,6 +122,27 @@ function PromptComposer() {
       </div>
 
       <div className="composer__context">
+        <label className="context-chip context-chip--select">
+          <MaterialIcon name="folder" />
+          <select
+            aria-label="Select project"
+            className="context-chip__select"
+            onChange={(event) => setSelectedProjectId(event.target.value)}
+            value={selectedProjectId}
+          >
+            {projects.length > 0 ? (
+              projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))
+            ) : (
+              <option value="">No projects</option>
+            )}
+          </select>
+          <MaterialIcon name="expand_more" />
+        </label>
+
         {contextItems.map((item) => (
           <button className="context-chip" type="button" key={item.label}>
             <MaterialIcon name={item.icon} />

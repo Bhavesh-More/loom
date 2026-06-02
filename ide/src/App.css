@@ -471,6 +471,29 @@ button {
   transition: color 180ms ease;
 }
 
+.context-chip--select {
+  min-width: 0;
+}
+
+.context-chip__select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  min-width: 0;
+  max-width: 220px;
+  outline: none;
+  padding: 0;
+}
+
+.context-chip__select:focus-visible {
+  color: var(--on-surface);
+}
+
 .context-chip:hover {
   color: var(--on-surface);
 }

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
+import { getProjects, type Project } from '../lib/projects'
 import MaterialIcon from './MaterialIcon'
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 
 export type AppPage = 'chat' | 'marketplace'
 
@@ -15,42 +14,6 @@ const primaryNav = [
   { label: 'Marketplace', icon: 'search', page: 'marketplace' as const },
 ]
 
-type Project = {
-  id: string
-  name: string
-}
-
-let cachedProjects: Project[] | null = null
-let projectsFetchPromise: Promise<Project[]> | null = null
-
-async function getProjects(): Promise<Project[]> {
-  if (cachedProjects) {
-    return cachedProjects
-  }
-  if (projectsFetchPromise) {
-    return projectsFetchPromise
-  }
-  projectsFetchPromise = (async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL.replace(/\/$/, '')}/projects/get-projects`, {
-        method: 'POST',
-      })
-      if (response.ok) {
-        const data = await response.json()
-        cachedProjects = data
-        return data
-      }
-      throw new Error('Failed to fetch projects')
-    } catch (e) {
-      projectsFetchPromise = null
-      throw e
-    } finally {
-      projectsFetchPromise = null
-    }
-  })()
-  return projectsFetchPromise
-}
-
 function Sidebar({ activePage, onNavigate }: SidebarProps) {
   const [projects, setProjects] = useState<Project[]>([])
 
@@ -58,11 +21,8 @@ function Sidebar({ activePage, onNavigate }: SidebarProps) {
     let active = true
 
     async function loadProjects(force = false) {
-      if (force) {
-        cachedProjects = null
-      }
       try {
-        const data = await getProjects()
+        const data = await getProjects(force)
         if (active) {
           setProjects(data)
         }
