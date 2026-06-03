@@ -5,30 +5,37 @@ from graph.state import LoomState
 from prompts.prompts import PLANNER_SYSTEM_PROMPT
 
 TIER_MAP = {
-    "postgresql":    1,
-    "mongodb":       1,
-    "supabase":      1,
-    "redis":         1,
-    "fastapi":       2,
-    "auth":          2,
-    "rag":           2,
-    "openai":        2,
-    "web_scraping":  2,
-    "langchain":     2,
-    "pytest":        3,
-    "streamlit":     4,
-    "docker":        5,
+    "postgresql":     1,
+    "mongodb":        1,
+    "supabase":       1,
+    "redis":          1,
+    "fastapi":        2,
+    "auth":           2,
+    "rag":            2,
+    "openai":         2,
+    "web_scraping":   2,
+    "langchain":      2,
+    "langgraph":      2,
+    "pytest":         3,
+    "streamlit":      4,
+    "docker":         5,
     "github_actions": 5,
-    "langgraph":     2,
 }
 
 
 def planner_node(state: LoomState) -> LoomState:
     """
     Calls Qwen3-32b (thinking enabled) to produce an ordered execution plan.
-    Populates state['execution_plan'].
+    Plans ONLY for state['active_agents'] — the subset the router decided is needed
+    for this specific query. This prevents running mongodb/fastapi when the user
+    only asked to generate the frontend.
     """
     print("\n[Planner] Generating execution plan...")
+
+    # KEY FIX: use active_agents (what the router decided), not selected_agents (the full team)
+    agents_to_plan = state.get("active_agents") or state["selected_agents"]
+
+    print(f"[Planner] Planning for agents: {agents_to_plan}")
 
     llm = ChatGroq(
         model="qwen/qwen3-32b",
@@ -37,18 +44,17 @@ def planner_node(state: LoomState) -> LoomState:
         max_tokens=4096,
     )
 
-    selected = state["selected_agents"]
     tier_context = {
         agent: TIER_MAP.get(agent, 99)
-        for agent in selected
+        for agent in agents_to_plan
     }
 
     user_message = f"""
 Project Goal: {state['goal']}
 
-Selected Agents: {json.dumps(selected)}
+Agents to plan for (ONLY these, do not add others): {json.dumps(agents_to_plan)}
 
-Tier Map for selected agents:
+Tier Map for these agents:
 {json.dumps(tier_context, indent=2)}
 
 Produce the execution plan now.
@@ -88,5 +94,5 @@ Produce the execution plan now.
         print(f"  Step {step.get('step')}: {step.get('agent')} — {step.get('task')[:80]}...")
 
     state["execution_plan"] = plan
-    state["current_step"] = 0
+    state["current_step"]   = 0
     return state

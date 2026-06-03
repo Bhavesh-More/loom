@@ -19,8 +19,8 @@ def executor_node(state: LoomState) -> LoomState:
         return state
 
     current_step = plan[step_index]
-    agent_name = current_step["agent"]
-    task = current_step["task"]
+    agent_name   = current_step["agent"]
+    task         = current_step["task"]
     context_keys = current_step.get("context_keys", [])
 
     print(f"\n[Executor] Step {step_index + 1}/{len(plan)}: Running agent '{agent_name}'")

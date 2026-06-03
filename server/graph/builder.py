@@ -1,57 +1,97 @@
 from langgraph.graph import StateGraph, END
+
 from graph.state import LoomState
+
 from graph.executor_node import executor_node
+from graph.qa_node import qa_node
 from graph.planner_node import planner_node
+from graph.router_node import router_node
 from graph.file_writer_node import file_writer_node
 
+# ---------------------------------------------------------------------------
+# Conditional edge: router decision
+# ---------------------------------------------------------------------------
+
+def route_after_router(state: LoomState) -> str:
+    """
+    Called after router_node.
+    'qa'      → jump to qa_node, skip all codegen
+    'codegen' → proceed to planner
+    """
+    return state.get("query_type", "codegen")
+
+
+# ---------------------------------------------------------------------------
+# Conditional edge: executor loop
+# ---------------------------------------------------------------------------
 
 def should_continue_execution(state: LoomState) -> str:
     """
-    Conditional edge function.
-    If there are still steps remaining in the plan, loop back to executor.
-    Otherwise, proceed to file_writer.
+    Loop executor until all plan steps are done,
+    then hand off to file_writer.
     """
     current_step = state.get("current_step", 0)
-    plan = state.get("execution_plan", [])
+    plan         = state.get("execution_plan", [])
 
     if current_step < len(plan):
         return "continue"
     return "done"
 
 
+# ---------------------------------------------------------------------------
+# Graph builder
+# ---------------------------------------------------------------------------
+
 def build_graph() -> StateGraph:
     """
-    Constructs and compiles the Loom LangGraph execution graph.
+    Full Loom execution graph.
 
-    Graph flow:
+    Flow:
         START
           ↓
-        planner
-          ↓
-        executor  ←──────────────┐
-          ↓                      │
-        [should_continue] ──"continue"
-          │
-        "done"
-          ↓
-        file_writer
-          ↓
-         END
+        router
+          ├─ "qa"      → qa_node → END
+          └─ "codegen" → planner
+                           ↓
+                         executor ←──────────┐
+                           ↓                 │
+                    [should_continue]──"continue"
+                           │
+                         "done"
+                           ↓
+                        file_writer
+                           ↓
+                          END
     """
     graph = StateGraph(LoomState)
 
-    # Register nodes
+    # Register all nodes
+    graph.add_node("router",      router_node)
+    graph.add_node("qa",          qa_node)
     graph.add_node("planner",     planner_node)
     graph.add_node("executor",    executor_node)
     graph.add_node("file_writer", file_writer_node)
 
-    # Entry point
-    graph.set_entry_point("planner")
+    # Entry point is always the router
+    graph.set_entry_point("router")
+
+    # router → qa or planner
+    graph.add_conditional_edges(
+        "router",
+        route_after_router,
+        {
+            "qa":      "qa",
+            "codegen": "planner",
+        },
+    )
+
+    # qa → END (no file writing for QA)
+    graph.add_edge("qa", END)
 
     # planner → executor (always)
     graph.add_edge("planner", "executor")
 
-    # executor → conditional branch
+    # executor → loop or done
     graph.add_conditional_edges(
         "executor",
         should_continue_execution,

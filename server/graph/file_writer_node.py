@@ -5,13 +5,26 @@ from tools.file_tools import ensure_workspace, write_all_outputs
 def file_writer_node(state: LoomState) -> LoomState:
     """
     Takes all agent_outputs from state and writes them to disk.
-    Creates outputs/<project-name>/ directory structure.
-    Each agent gets its own subfolder: outputs/<project-name>/<agent-name>/
+
+    Folder structure (defined in tools/file_tools.py AGENT_FOLDER_MAP):
+        outputs/<project-name>/
+            backend/
+                api/          ← fastapi
+                db/           ← postgresql, mongodb, supabase
+                cache/        ← redis
+                auth/         ← auth
+                ai/           ← rag, openai, langchain, langgraph
+                scraper/      ← web_scraping
+                tests/        ← pytest
+                infra/        ← docker, github_actions
+            frontend/
+                app/          ← streamlit
+
     Updates state['workspace_path'] with the resolved absolute path.
     """
     print("\n[FileWriter] Writing all agent outputs to disk...")
 
-    project_name = state.get("project_name") or state.get("project_id", "unnamed-project")
+    project_name   = state.get("project_name") or state.get("project_id", "unnamed-project")
     workspace_path = ensure_workspace(project_name)
     state["workspace_path"] = workspace_path
 
