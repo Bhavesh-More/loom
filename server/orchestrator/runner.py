@@ -29,6 +29,10 @@ def run_project(
         "project_name":    project_name,
         "goal":            goal,
         "selected_agents": selected_agents,
+        # Router fills these in at runtime
+        "active_agents":   [],
+        "query_type":      "",
+        "qa_response":     "",
         "execution_plan":  [],
         "current_step":    0,
         "agent_outputs":   {},
@@ -46,8 +50,12 @@ def run_project(
     final_state = loom_graph.invoke(initial_state)
 
     print(f"\n{'='*60}")
-    print(f"  LOOM — Project complete!")
-    print(f"  Workspace  : {final_state.get('workspace_path')}")
+    print(f"  LOOM — Done!")
+    print(f"  Query type : {final_state.get('query_type')}")
+    if final_state.get("query_type") == "qa":
+        print(f"  QA Answer  :\n{final_state.get('qa_response', '')}")
+    else:
+        print(f"  Workspace  : {final_state.get('workspace_path')}")
     if final_state.get("errors"):
         print(f"  Errors ({len(final_state['errors'])}):")
         for err in final_state["errors"]:
