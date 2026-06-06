@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { getProjects, getChats, type Project, type Chat } from '../lib/projects'
 
 export type AppPage = 'chat' | 'marketplace'
@@ -13,6 +13,10 @@ type SidebarProps = {
 function Sidebar({ activePage, onNavigate, activeChatId, onSelectChat }: SidebarProps) {
   const [projects, setProjects] = useState<Project[]>([])
   const [chats, setChats] = useState<Chat[]>([])
+  const [isAddingProject, setIsAddingProject] = useState(false)
+  const [newProjectPath, setNewProjectPath] = useState('')
+  const [newProjectName, setNewProjectName] = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     let active = true
@@ -47,15 +51,66 @@ function Sidebar({ activePage, onNavigate, activeChatId, onSelectChat }: Sidebar
     }
   }, [])
 
+  const handleAddProjectClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click()
+    }
+  }
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (files && files.length > 0) {
+      const folder = files[0]
+      const folderName = folder.name || 'New Project'
+      setNewProjectName(folderName)
+      setNewProjectPath(folder.path || '')
+      setIsAddingProject(true)
+    }
+  }
+
+  const handleSaveProject = () => {
+    if (newProjectName) {
+      fetch(`${import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'}/projects/create`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: newProjectName,
+          path: newProjectPath,
+        }),
+      })
+        .then(async (res) => {
+          if (!res.ok) {
+            const errorText = await res.text()
+            throw new Error(errorText || 'Failed to create project')
+          }
+          window.dispatchEvent(new CustomEvent('project-created'))
+          setIsAddingProject(false)
+          setNewProjectName('')
+          setNewProjectPath('')
+        })
+        .catch((error) => {
+          console.error('Failed to create project:', error)
+          alert(`Failed to create project: ${error.message}`)
+        })
+    }
+  }
+
+  const handleCancelAddProject = () => {
+    setIsAddingProject(false)
+    setNewProjectName('')
+    setNewProjectPath('')
+  }
+
   return (
     <aside
-      className="hidden md:flex flex-col h-full border-r border-outline-variant bg-surface-container-low dark:bg-surface-container-lowest h-screen w-sidebar-width shrink-0"
+      className="hidden md:flex flex-col h-full bg-[#161616] h-screen w-sidebar-width shrink-0"
       aria-label="Workspace navigation"
     >
       {/* Brand Header */}
       <div className="px-6 py-6 flex items-center justify-between">
         <div className="flex gap-3 items-center">
-          <span className="material-symbols-outlined text-primary text-[24px]">robot_2</span>
           <div className="flex flex-col">
             <span className="font-headline-lg text-headline-lg font-bold text-primary dark:text-primary text-[20px] leading-none tracking-tight">
               L00m AI
@@ -111,7 +166,7 @@ function Sidebar({ activePage, onNavigate, activeChatId, onSelectChat }: Sidebar
             </button>
 
             {/* Other links */}
-            <a
+            {/* <a
               className="flex items-center gap-3 text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary px-4 py-2 transition-colors font-body-sm text-body-sm hover:bg-surface-container-highest dark:hover:bg-surface-container-high"
               href="#"
             >
@@ -124,19 +179,35 @@ function Sidebar({ activePage, onNavigate, activeChatId, onSelectChat }: Sidebar
             >
               <span className="material-symbols-outlined text-[18px]">smart_toy</span>
               <span>Automations</span>
-            </a>
+            </a> */}
 
             {/* ── Projects ───────────────────────────────────────── */}
-            <div className="mt-6 px-4 mb-1">
-              <span className="font-label-caps text-label-caps text-on-surface-variant opacity-70 text-[11px] tracking-widest uppercase">
+            <div
+              className="mt-2 p-2 px-4 mb-1 flex items-center justify-between cursor-pointer hover:bg-surface-container-high dark:hover:bg-surface-container-high rounded px-2"
+              onClick={handleAddProjectClick}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === 'Enter' && handleAddProjectClick()}
+              title="Add existing project"
+            >
+              <span className="text-label-caps text-on-surface-variant opacity-70 text-[11px] tracking-widest">
                 Projects
               </span>
+              <span className="material-symbols-outlined text-[16px] text-on-surface-variant opacity-70 hover:text-primary dark:hover:text-primary transition-colors">
+                add
+              </span>
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                onChange={handleFileSelect}
+              />
             </div>
 
             {projects.length > 0 ? (
               projects.map((project) => (
                 <a
-                  className="flex items-center gap-3 text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary px-4 py-2 transition-all font-body-sm text-body-sm hover:bg-surface-container-highest dark:hover:bg-surface-container-high"
+                  className="flex items-center gap-3 text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary px-4 py-2 transition-all font-body-sm text-body-sm hover:bg-surface-container-highest dark:hover:bg-surface-container-high cursor-pointer"
                   href="#"
                   key={project.id}
                 >
@@ -144,15 +215,75 @@ function Sidebar({ activePage, onNavigate, activeChatId, onSelectChat }: Sidebar
                   <span className="truncate">{project.name}</span>
                 </a>
               ))
-            ) : (
-              <span className="px-4 py-1.5 text-[12px] text-on-surface-variant italic">
-                No projects yet
-              </span>
+            ) : null}
+
+            {/* Add Project Modal/Dialog */}
+            {isAddingProject && (
+              <div className="px-4 py-3 bg-surface-container-high dark:bg-surface-container-high rounded-lg mb-2 animate-step-fade-in">
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="material-symbols-outlined text-primary text-[20px]">folder_open</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-primary font-medium text-[13px] truncate">{newProjectName}</p>
+                    <p className="text-on-surface-variant text-[11px] truncate">{newProjectPath}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleCancelAddProject}
+                    className="flex items-center gap-1.5 text-on-surface-variant hover:text-primary text-[11px] px-2 py-1 hover:bg-surface-container-high rounded transition-colors"
+                    type="button"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">close</span>
+                    Cancel
+                  </button>
+                  <div className="flex-1" />
+                  <button
+                    onClick={handleSaveProject}
+                    className="flex items-center gap-1.5 text-on-primary bg-primary hover:bg-primary/90 text-[11px] px-3 py-1.5 rounded transition-colors"
+                    type="button"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">save</span>
+                    Save
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Add Project Modal/Dialog */}
+            {isAddingProject && (
+              <div className="px-4 py-3 bg-surface-container-high dark:bg-surface-container-high rounded-lg mb-2">
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="material-symbols-outlined text-primary text-[20px]">folder_open</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-primary font-medium text-[13px] truncate">{newProjectName}</p>
+                    <p className="text-on-surface-variant text-[11px] truncate">{newProjectPath}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleCancelAddProject}
+                    className="flex items-center gap-1.5 text-on-surface-variant hover:text-primary text-[11px] px-2 py-1 hover:bg-surface-container-high rounded transition-colors"
+                    type="button"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">close</span>
+                    Cancel
+                  </button>
+                  <div className="flex-1" />
+                  <button
+                    onClick={handleSaveProject}
+                    className="flex items-center gap-1.5 text-on-primary bg-primary hover:bg-primary/90 text-[11px] px-3 py-1.5 rounded transition-colors"
+                    type="button"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">save</span>
+                    Save
+                  </button>
+                </div>
+              </div>
             )}
 
             {/* ── Chats ─────────────────────────────────────────── */}
             <div className="mt-5 px-4 mb-1">
-              <span className="font-label-caps text-label-caps text-on-surface-variant opacity-70 text-[11px] tracking-widest uppercase">
+              <span className="font-label-caps text-label-caps text-on-surface-variant opacity-70 text-[11px] tracking-widest ">
                 Chats
               </span>
             </div>

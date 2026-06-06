@@ -4,6 +4,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000
 
 import AgentCard, { type AgentCardData } from './AgentCard'
 import MaterialIcon from './MaterialIcon'
+import BorderGlow from './BorderGlow'
 
 const INITIAL_VISIBLE_AGENTS = 12
 
@@ -86,13 +87,25 @@ function AgentGrid({
 
       <div className="agent-grid">
         {visibleAgents.map((agent) => (
-          <AgentCard
-            agent={agent}
-            isSelected={selectedAgentNames.has(agent.name)}
+          <BorderGlow
             key={agent.name}
-            onAddToTeam={onAddToTeam}
-            onRemoveFromTeam={onRemoveFromTeam}
-          />
+            edgeSensitivity={78}
+            glowColor="40 80 80"
+            backgroundColor="#120F17"
+            borderRadius={28}
+            glowRadius={40}
+            glowIntensity={1}
+            coneSpread={25}
+            animated={false}
+            colors={['#c084fc', '#f472b6', '#38bdf8']}
+          >
+            <AgentCard
+              agent={agent}
+              isSelected={selectedAgentNames.has(agent.name)}
+              onAddToTeam={onAddToTeam}
+              onRemoveFromTeam={onRemoveFromTeam}
+            />
+          </BorderGlow>
         ))}
       </div>
 

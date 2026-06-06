@@ -974,10 +974,18 @@ button {
     transform 180ms ease;
 }
 
-.agent-card:hover {
-  border-color: color-mix(in srgb, var(--outline) 75%, transparent);
-  box-shadow: 0 20px 56px rgba(0, 0, 0, 0.28);
-  transform: translateY(-2px);
+.border-glow-inner .agent-card {
+  background: transparent;
+  border: none;
+  height: 100%;
+  min-height: auto;
+  border-radius: inherit;
+}
+
+.border-glow-inner {
+  overflow: hidden;
+  height: 100%;
+  width: 100%;
 }
 
 .agent-card--community {

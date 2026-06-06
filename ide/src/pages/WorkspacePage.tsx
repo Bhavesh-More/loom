@@ -1,4 +1,8 @@
 import { useEffect, useState, useRef } from 'react'
+
+interface RippleEvent extends React.MouseEvent<HTMLButtonElement> {
+  currentTarget: HTMLButtonElement
+}
 import PromptComposer from '../components/PromptComposer'
 import Sidebar, { type AppPage } from '../components/Sidebar'
 import SuggestionGrid from '../components/SuggestionGrid'
@@ -136,6 +140,29 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
   const [activeChatId, setActiveChatId] = useState<string | null>(null)
   const [followUpText, setFollowUpText] = useState('')
   const timerRef = useRef<number | null>(null)
+
+  // Task 4: Ripple effect helper
+  const createRipple = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const button = e.currentTarget
+    const ripple = document.createElement('span')
+    const rect = button.getBoundingClientRect()
+    const size = Math.max(rect.width, rect.height)
+    const x = e.clientX - rect.left - size / 2
+    const y = e.clientY - rect.top - size / 2
+
+    ripple.style.width = ripple.style.height = `${size}px`
+    ripple.style.left = `${x}px`
+    ripple.style.top = `${y}px`
+    ripple.style.borderRadius = '50%'
+    ripple.style.position = 'absolute'
+    ripple.style.backgroundColor = 'rgba(255, 255, 255, 0.4)'
+    ripple.style.transform = 'scale(0)'
+    ripple.style.animation = 'rippleAnimation 0.6s ease-out'
+    ripple.style.pointerEvents = 'none'
+
+    button.appendChild(ripple)
+    setTimeout(() => ripple.remove(), 600)
+  }
 
   const handleSelectChat = async (chatId: string) => {
     setActiveChatId(chatId)
@@ -291,7 +318,7 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
     : false
 
   return (
-    <div className="h-screen w-full flex overflow-hidden bg-background">
+    <div className="h-screen w-full flex overflow-hidden ">
       {/* Sidebar Component */}
       <Sidebar 
         activePage={activePage} 
@@ -307,7 +334,7 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
       />
 
       {/* Main Content Pane */}
-      <main className="flex-1 flex flex-col h-full bg-[#000000] relative overflow-hidden">
+      <main className="flex-1 flex flex-col h-full bg-[#101010] relative overflow-hidden">
         {/* Dynamic Top Header */}
         <TopAppBar 
           projectName={activeSession?.projectName} 
@@ -326,14 +353,14 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
                 <div className="max-w-3xl mx-auto w-full px-6 py-8 flex flex-col gap-8">
                   
                   {/* User Prompt Card */}
-                  <div className="glass-panel p-6 rounded-xl flex gap-4 border border-[#262626] animate-step-fade-in">
+                  {/* <div className="glass-panel p-6 rounded-xl flex gap-4 border border-[#262626] animate-step-fade-in">
                     <div className="w-8 h-8 rounded-full bg-surface-variant flex items-center justify-center shrink-0">
                       <span className="material-symbols-outlined text-[18px] text-on-surface-variant">person</span>
                     </div>
                     <div className="font-body-sm text-body-sm text-on-surface leading-relaxed whitespace-pre-wrap flex-1">
                       {activeSession.prompt}
                     </div>
-                  </div>
+                  </div> */}
 
                   {/* AI Agent Activity Feed */}
                   <div className="flex flex-col gap-6 ml-2">
@@ -459,8 +486,8 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
               {/* Sticky Chat Input Box at the Bottom of Left Pane */}
               <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-full max-w-2xl px-6 z-10 flex flex-col items-center">
                 <div className="w-full bg-[#171717] border border-[#262626] rounded-xl flex flex-col shadow-2xl">
-                  <input 
-                    className="w-full bg-transparent border-none text-primary placeholder-on-surface-variant/40 px-4 py-4 focus:ring-0 focus:border-transparent outline-none text-[16px] leading-tight" 
+                  <input
+                    className="w-full bg-transparent border-none text-primary placeholder-on-surface-variant/40 px-4 py-4 focus:ring-0 focus:border-transparent outline-none text-[16px] leading-tight"
                     value={followUpText}
                     onChange={(e) => setFollowUpText(e.target.value)}
                     onKeyDown={(e) => {
@@ -469,35 +496,54 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
                         setFollowUpText('') // Clear locally, do not submit to backend
                       }
                     }}
-                    placeholder="Ask for follow-up changes" 
-                    type="text" 
+                    placeholder="Ask for follow-up changes"
+                    type="text"
                   />
                   <div className="flex justify-between items-center px-4 pb-3">
                     <div className="flex items-center gap-2">
                       <button className="p-1.5 text-on-surface-variant hover:text-white rounded hover:bg-[#262626] transition-colors" type="button" aria-label="Add attachment">
                         <span className="material-symbols-outlined text-[20px]">add</span>
                       </button>
-                      <button className="flex items-center gap-1.5 text-[12px] text-on-surface-variant hover:text-white px-2.5 py-1 rounded border border-outline-variant/30 hover:bg-[#262626] transition-colors" type="button">
-                        <span className="material-symbols-outlined text-[16px]">pan_tool</span>
-                        <span>Default permissions</span>
-                        <span className="material-symbols-outlined text-[16px]">keyboard_arrow_down</span>
-                      </button>
+                      {/* Task 2: Permission select with auto-review and Full Access options */}
+                      <div className="relative">
+                        <select className="flex items-center gap-1.5 text-[12px] text-on-surface-variant hover:text-white px-2.5 py-1 rounded border border-outline-variant/30 hover:bg-[#262626] transition-colors cursor-pointer appearance-none bg-[#171717]">
+                          <option value="auto-review">Auto-review</option>
+                          <option value="full-access">Full Access</option>
+                        </select>
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-[16px] text-on-surface-variant">keyboard_arrow_down</span>
+                      </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="text-[12px] text-on-surface-variant font-code-md">
-                        5.5 <span className="opacity-50">High</span> <span className="material-symbols-outlined text-[14px] align-middle">keyboard_arrow_down</span>
-                      </span>
-                      <button className="p-1.5 text-on-surface-variant hover:text-white rounded hover:bg-[#262626] transition-colors" type="button" aria-label="Use mic">
-                        <span className="material-symbols-outlined text-[20px]">mic</span>
-                      </button>
-                      <button 
-                        onClick={() => setFollowUpText('')}
+                      {/* Task 3: Model selector */}
+                      <div className="relative">
+                        <select className="text-[12px] text-on-surface-variant font-code-md bg-[#171717] border border-outline-variant/30 rounded px-2 py-1 cursor-pointer appearance-none hover:text-white hover:border-primary">
+                          <option value="5.5">5.5 <span className="opacity-50">High</span></option>
+                          <option value="4.0">4.0 <span className="opacity-50">Medium</span></option>
+                          <option value="3.5">3.5 <span className="opacity-50">Low</span></option>
+                        </select>
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-[14px] text-on-surface-variant">keyboard_arrow_down</span>
+                      </div>
+                      {/* Task 3: Agent selector */}
+                      <div className="relative">
+                        <select className="text-[12px] text-on-surface-variant font-code-md bg-[#171717] border border-outline-variant/30 rounded px-2 py-1 cursor-pointer appearance-none hover:text-white hover:border-primary">
+                          <option value="dev-agent">Dev Agent</option>
+                          <option value="review-agent">Review Agent</option>
+                          <option value="qa-agent">QA Agent</option>
+                        </select>
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-[14px] text-on-surface-variant">keyboard_arrow_down</span>
+                      </div>
+                      {/* Task 4: Submit button with ripple effect */}
+                      <button
+                        onClick={(e) => {
+                          createRipple(e)
+                          setFollowUpText('')
+                        }}
                         className={`w-8 h-8 rounded flex items-center justify-center transition-all ${
                           followUpText.trim()
                             ? 'bg-primary text-on-primary hover:bg-opacity-90 active:scale-95 cursor-pointer'
                             : 'bg-[#353534] text-on-surface-variant opacity-50 cursor-not-allowed'
                         }`}
-                        type="button" 
+                        type="button"
                         aria-label="Submit follow-up"
                       >
                         <span className="material-symbols-outlined text-[20px]">arrow_upward</span>
