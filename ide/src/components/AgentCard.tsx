@@ -1,4 +1,5 @@
 import MaterialIcon from './MaterialIcon'
+import type { AgentCategory } from '../lib/marketplace'
 
 export type AgentCardData = {
   id: string
@@ -12,6 +13,9 @@ export type AgentCardData = {
   sources: string[]
   synced: string
   installs: string
+  category: AgentCategory
+  createdAt: string | null
+  syncedAt: string | null
 }
 
 type AgentCardProps = {

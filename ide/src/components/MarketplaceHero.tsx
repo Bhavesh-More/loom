@@ -1,18 +1,11 @@
 import MaterialIcon from './MaterialIcon'
-import type { AgentCardData } from './AgentCard'
-import MarketplaceCart from './MarketplaceCart'
 
 type MarketplaceHeroProps = {
-  selectedAgents: AgentCardData[]
-  onCheckout: () => void
-  onRemoveFromTeam: (agentName: string) => void
+  searchTerm: string
+  onSearchChange: (value: string) => void
 }
 
-function MarketplaceHero({
-  selectedAgents,
-  onCheckout,
-  onRemoveFromTeam,
-}: MarketplaceHeroProps) {
+function MarketplaceHero({ searchTerm, onSearchChange }: MarketplaceHeroProps) {
   return (
     <section className="market-hero">
       <div className="market-hero__copy">
@@ -27,20 +20,12 @@ function MarketplaceHero({
           <input
             type="search"
             placeholder="Search agents by name, specialty, or library..."
+            value={searchTerm}
+            onChange={(event) => onSearchChange(event.target.value)}
           />
         </label>
-
-        <button className="market-hero__cta" type="button">
-          <MaterialIcon name="add" />
-          <span>Create Agent</span>
-        </button>
       </div>
 
-      <MarketplaceCart
-        agents={selectedAgents}
-        onCheckout={onCheckout}
-        onRemove={onRemoveFromTeam}
-      />
     </section>
   )
 }

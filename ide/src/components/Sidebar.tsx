@@ -60,7 +60,7 @@ function Sidebar({ activePage, onNavigate, activeChatId, onSelectChat }: Sidebar
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files
     if (files && files.length > 0) {
-      const folder = files[0]
+      const folder = files[0] as File & { path?: string }
       const folderName = folder.name || 'New Project'
       setNewProjectName(folderName)
       setNewProjectPath(folder.path || '')
@@ -249,37 +249,6 @@ function Sidebar({ activePage, onNavigate, activeChatId, onSelectChat }: Sidebar
               </div>
             )}
 
-            {/* Add Project Modal/Dialog */}
-            {isAddingProject && (
-              <div className="px-4 py-3 bg-surface-container-high dark:bg-surface-container-high rounded-lg mb-2">
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="material-symbols-outlined text-primary text-[20px]">folder_open</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-primary font-medium text-[13px] truncate">{newProjectName}</p>
-                    <p className="text-on-surface-variant text-[11px] truncate">{newProjectPath}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleCancelAddProject}
-                    className="flex items-center gap-1.5 text-on-surface-variant hover:text-primary text-[11px] px-2 py-1 hover:bg-surface-container-high rounded transition-colors"
-                    type="button"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">close</span>
-                    Cancel
-                  </button>
-                  <div className="flex-1" />
-                  <button
-                    onClick={handleSaveProject}
-                    className="flex items-center gap-1.5 text-on-primary bg-primary hover:bg-primary/90 text-[11px] px-3 py-1.5 rounded transition-colors"
-                    type="button"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">save</span>
-                    Save
-                  </button>
-                </div>
-              </div>
-            )}
 
             {/* ── Chats ─────────────────────────────────────────── */}
             <div className="mt-5 px-4 mb-1">
@@ -323,7 +292,15 @@ function Sidebar({ activePage, onNavigate, activeChatId, onSelectChat }: Sidebar
       </nav>
 
       {/* Footer */}
-      <div className="mt-auto border-t border-outline-variant py-2">
+      <div className="marketplace-sidebar-footer mt-auto border-t border-outline-variant py-2">
+        <button
+          className="marketplace-sidebar-action"
+          onClick={() => onNavigate('marketplace')}
+          type="button"
+        >
+          <span className="material-symbols-outlined text-[18px]">add_circle</span>
+          <span>Create Agent</span>
+        </button>
         <a
           className="flex items-center gap-3 text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary px-4 py-2 transition-all font-body-sm text-body-sm hover:bg-surface-container-highest dark:hover:bg-surface-container-high"
           href="#"

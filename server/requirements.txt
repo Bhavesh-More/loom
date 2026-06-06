@@ -5,3 +5,6 @@ langchain-groq
 asyncpg
 fastapi
 uvicorn
+pydantic
+requests
+streamlit

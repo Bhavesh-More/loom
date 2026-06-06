@@ -138,7 +138,7 @@ const BorderGlow = ({
         '--card-bg': backgroundColor,
         '--edge-sensitivity': edgeSensitivity,
         '--border-radius': `${borderRadius}px`,
-        '--glow-padding': `${glowRadius}px`,
+        '--glow-padding': `${glowRadius}px`,  
         '--cone-spread': coneSpread,
         '--fill-opacity': fillOpacity,
         ...glowVars,
