@@ -1223,6 +1223,18 @@ button {
   color: var(--primary);
 }
 
+.agent-card__secondary-action {
+  flex: 0 0 auto !important;
+  background: transparent !important;
+  color: var(--on-surface-variant) !important;
+  padding-inline: 12px !important;
+}
+
+.agent-card__secondary-action:hover {
+  background: var(--surface-container-high) !important;
+  color: var(--error) !important;
+}
+
 .market-pagination {
   display: flex;
   align-items: center;

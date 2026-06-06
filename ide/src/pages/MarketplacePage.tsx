@@ -1,10 +1,8 @@
 import { useState } from 'react'
 
-import type { AgentCardData } from '../components/AgentCard'
 import AgentGrid from '../components/AgentGrid'
 import MarketplaceFilterBar from '../components/MarketplaceFilterBar'
 import MarketplaceHero from '../components/MarketplaceHero'
-import ProjectCheckoutModal from '../components/ProjectCheckoutModal'
 import MaterialIcon from '../components/MaterialIcon'
 import { type AppPage } from '../components/Sidebar'
 import Grainient from '@/components/Grainient'
@@ -20,25 +18,9 @@ type MarketplacePageProps = {
 }
 
 function MarketplacePage({ onNavigate }: MarketplacePageProps) {
-  const [selectedAgents, setSelectedAgents] = useState<AgentCardData[]>([])
-  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
   const [activeFilter, setActiveFilter] = useState<MarketplaceFilter>(MARKETPLACE_FILTERS[0])
   const [sortOption, setSortOption] = useState<MarketplaceSort>(MARKETPLACE_SORT_OPTIONS[0])
   const [searchTerm, setSearchTerm] = useState('')
-
-  const handleAddToTeam = (agent: AgentCardData) => {
-    setSelectedAgents((currentAgents) =>
-      currentAgents.some((currentAgent) => currentAgent.name === agent.name)
-        ? currentAgents
-        : [...currentAgents, agent],
-    )
-  }
-
-  const handleRemoveFromTeam = (agentName: string) => {
-    setSelectedAgents((currentAgents) =>
-      currentAgents.filter((agent) => agent.name !== agentName),
-    )
-  }
 
   return (
     <div className="workspace-app">
@@ -94,26 +76,11 @@ function MarketplacePage({ onNavigate }: MarketplacePageProps) {
         />
         <AgentGrid
           key={`${activeFilter}-${sortOption}-${searchTerm}`}
-          selectedAgents={selectedAgents}
-          onAddToTeam={handleAddToTeam}
-          onRemoveFromTeam={handleRemoveFromTeam}
           activeFilter={activeFilter}
           sortOption={sortOption}
           searchTerm={searchTerm}
         />
       </main>
-
-      {isCheckoutOpen ? (
-        <ProjectCheckoutModal
-          agents={selectedAgents}
-          onClose={() => setIsCheckoutOpen(false)}
-          onSuccess={() => {
-            setIsCheckoutOpen(false)
-            setSelectedAgents([])
-          }}
-          onRemoveAgent={handleRemoveFromTeam}
-        />
-      ) : null}
     </div>
   )
 }

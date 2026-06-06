@@ -223,7 +223,11 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
     }
   }, [activeSession?.status])
 
-  const handleSendPrompt = async (projectId: string, promptText: string) => {
+  const handleSendPrompt = async (
+    projectId: string,
+    promptText: string,
+    selectedAgentIds: string[]
+  ) => {
     setActiveChatId(null)
     const newSession: ChatSession = {
       projectId: projectId,
@@ -238,7 +242,7 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
     setActiveSession(newSession)
 
     try {
-      await developProjectStream(projectId, promptText, (chunk) => {
+      await developProjectStream(projectId, promptText, selectedAgentIds, (chunk) => {
         if (chunk.type === 'start') {
           if (chunk.chat_id) {
             setActiveChatId(chunk.chat_id)
