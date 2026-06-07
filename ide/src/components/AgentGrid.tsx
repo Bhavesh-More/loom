@@ -1,69 +1,39 @@
 import { useEffect, useState } from 'react'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
-
-import AgentCard, { type AgentCardData } from './AgentCard'
+import AgentCard from './AgentCard'
 import MaterialIcon from './MaterialIcon'
 import BorderGlow from './BorderGlow'
 import type { MarketplaceFilter, MarketplaceSort } from '../lib/marketplace'
+import {
+  downloadAgent,
+  getAgents,
+  uninstallAgent,
+  type AgentData,
+} from '../lib/agents'
 
 const INITIAL_VISIBLE_AGENTS = 12
 
-let cachedAgents: AgentCardData[] | null = null
-let agentsFetchPromise: Promise<AgentCardData[]> | null = null
-
-async function getAgents(): Promise<AgentCardData[]> {
-  if (cachedAgents) {
-    return cachedAgents
-  }
-  if (agentsFetchPromise) {
-    return agentsFetchPromise
-  }
-  agentsFetchPromise = (async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL.replace(/\/$/, '')}/agents`)
-      if (response.ok) {
-        const data = await response.json()
-        cachedAgents = data
-        return data
-      }
-      throw new Error('Failed to fetch agents')
-    } catch (e) {
-      agentsFetchPromise = null
-      throw e
-    } finally {
-      agentsFetchPromise = null
-    }
-  })()
-  return agentsFetchPromise
-}
-
 type AgentGridProps = {
-  selectedAgents: AgentCardData[]
-  onAddToTeam: (agent: AgentCardData) => void
-  onRemoveFromTeam: (agentName: string) => void
   activeFilter: MarketplaceFilter
   sortOption: MarketplaceSort
   searchTerm: string
 }
 
 function AgentGrid({
-  selectedAgents,
-  onAddToTeam,
-  onRemoveFromTeam,
   activeFilter,
   sortOption,
   searchTerm,
 }: AgentGridProps) {
   const [showAllAgents, setShowAllAgents] = useState(false)
-  const [agents, setAgents] = useState<AgentCardData[]>(cachedAgents || [])
+  const [agents, setAgents] = useState<AgentData[]>([])
+  const [pendingAgentId, setPendingAgentId] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
 
-    async function loadAgents() {
+    async function loadAgents(forceRefresh = false) {
       try {
-        const data = await getAgents()
+        const data = await getAgents(forceRefresh)
         if (active) {
           setAgents(data)
         }
@@ -73,9 +43,12 @@ function AgentGrid({
     }
 
     void loadAgents()
+    const handleAgentsChanged = () => void loadAgents(true)
+    window.addEventListener('agents-changed', handleAgentsChanged)
 
     return () => {
       active = false
+      window.removeEventListener('agents-changed', handleAgentsChanged)
     }
   }, [])
 
@@ -141,9 +114,34 @@ function AgentGrid({
     ? sortedAgents
     : sortedAgents.slice(0, INITIAL_VISIBLE_AGENTS)
   const remainingAgents = sortedAgents.length - visibleAgents.length
-  const selectedAgentNames = new Set(selectedAgents.map((agent) => agent.name))
   const sectionTitle =
     activeFilter === 'All Agents' ? 'Popular Agents' : `${activeFilter} Agents`
+
+  const handleDownload = async (agentId: string) => {
+    setPendingAgentId(agentId)
+    try {
+      await downloadAgent(agentId)
+      const refreshedAgents = await getAgents(true)
+      setAgents(refreshedAgents)
+    } catch (error) {
+      console.error('Failed to download agent', error)
+    } finally {
+      setPendingAgentId(null)
+    }
+  }
+
+  const handleUninstall = async (agentId: string) => {
+    setPendingAgentId(agentId)
+    try {
+      await uninstallAgent(agentId)
+      const refreshedAgents = await getAgents(true)
+      setAgents(refreshedAgents)
+    } catch (error) {
+      console.error('Failed to uninstall agent', error)
+    } finally {
+      setPendingAgentId(null)
+    }
+  }
 
   return (
     <section className="agent-section">
@@ -171,9 +169,9 @@ function AgentGrid({
             >
               <AgentCard
                 agent={agent}
-                isSelected={selectedAgentNames.has(agent.name)}
-                onAddToTeam={onAddToTeam}
-                onRemoveFromTeam={onRemoveFromTeam}
+                isPending={pendingAgentId === agent.id}
+                onDownload={handleDownload}
+                onUninstall={handleUninstall}
               />
             </BorderGlow>
           ))}

@@ -1,20 +1,9 @@
 import { type ChangeEvent, useEffect, useRef, useState } from 'react'
-import { getProjects, type Project, developProject } from '../lib/projects'
-
-const contextItems = [
-  { label: 'Work locally', icon: 'laptop_windows' },
-  { label: 'main', icon: 'account_tree' },
-]
-
-const agentsList = [
-  { id: 'coder', label: 'Coder Agent', icon: 'smart_toy' },
-  { id: 'researcher', label: 'Researcher Agent', icon: 'psychology' },
-  { id: 'debugger', label: 'Debugger Agent', icon: 'bug_report' },
-  { id: 'designer', label: 'Designer Agent', icon: 'palette' }
-]
+import { getProjects, developProject } from '../lib/projects'
+import { getDownloadedAgents, type AgentData } from '../lib/agents'
 
 type PromptComposerProps = {
-  onSendPrompt?: (projectId: string, prompt: string) => Promise<void> | void
+  onSendPrompt?: (projectId: string, prompt: string, selectedAgentIds: string[]) => Promise<void> | void
   isDevelopingProps?: boolean
 }
 
@@ -22,7 +11,6 @@ function PromptComposer({ onSendPrompt, isDevelopingProps }: PromptComposerProps
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const agentDropdownRef = useRef<HTMLDivElement>(null)
   const [prompt, setPrompt] = useState('')
-  const [projects, setProjects] = useState<Project[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState('')
   const [isDevelopingState, setIsDevelopingState] = useState(false)
   const isDeveloping = isDevelopingProps !== undefined ? isDevelopingProps : isDevelopingState
@@ -32,7 +20,8 @@ function PromptComposer({ onSendPrompt, isDevelopingProps }: PromptComposerProps
   // Custom states for permission, model, agents, and ripple effect
   const [permission, setPermission] = useState('default')
   const [selectedModel, setSelectedModel] = useState('gemini-1.5-pro')
-  const [selectedAgents, setSelectedAgents] = useState<string[]>(['coder', 'researcher'])
+  const [downloadedAgents, setDownloadedAgents] = useState<AgentData[]>([])
+  const [selectedAgents, setSelectedAgents] = useState<string[]>([])
   const [isAgentDropdownOpen, setIsAgentDropdownOpen] = useState(false)
   const [isRippling, setIsRippling] = useState(false)
 
@@ -47,7 +36,7 @@ function PromptComposer({ onSendPrompt, isDevelopingProps }: PromptComposerProps
   }
 
   const handleSend = async () => {
-    if (!prompt.trim() || !selectedProjectId || isDeveloping) {
+    if (!prompt.trim() || !selectedProjectId || selectedAgents.length === 0 || isDeveloping) {
       return
     }
 
@@ -58,7 +47,7 @@ function PromptComposer({ onSendPrompt, isDevelopingProps }: PromptComposerProps
     }, 2500)
 
     if (onSendPrompt) {
-      void onSendPrompt(selectedProjectId, prompt.trim())
+      void onSendPrompt(selectedProjectId, prompt.trim(), selectedAgents)
       setPrompt('')
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto'
@@ -71,7 +60,7 @@ function PromptComposer({ onSendPrompt, isDevelopingProps }: PromptComposerProps
     setDevelopSuccess('')
 
     try {
-      const result = await developProject(selectedProjectId, prompt.trim())
+      const result = await developProject(selectedProjectId, prompt.trim(), selectedAgents)
       let successMsg = `Successfully developed project! Files written to: ${result.workspace_path}`
       if (result.errors && result.errors.length > 0) {
         successMsg += ` (with errors: ${result.errors.join(', ')})`
@@ -98,37 +87,57 @@ function PromptComposer({ onSendPrompt, isDevelopingProps }: PromptComposerProps
   useEffect(() => {
     let active = true
 
-    async function loadProjects(force = false) {
+    async function loadComposerData(force = false) {
       try {
-        const data = await getProjects(force)
+        const [projectData, downloadedAgentData] = await Promise.all([
+          getProjects(force),
+          getDownloadedAgents(force),
+        ])
         if (!active) {
           return
         }
 
-        setProjects(data)
+        setDownloadedAgents(downloadedAgentData)
         setSelectedProjectId((currentProjectId) => {
-          if (data.some((project) => project.id === currentProjectId)) {
+          if (projectData.some((project) => project.id === currentProjectId)) {
             return currentProjectId
           }
 
-          return data[0]?.id ?? ''
+          return projectData[0]?.id ?? ''
+        })
+        setSelectedAgents((currentSelectedAgents) => {
+          const availableAgentIds = new Set(downloadedAgentData.map((agent) => agent.id))
+          const filteredAgentIds = currentSelectedAgents.filter((agentId) =>
+            availableAgentIds.has(agentId),
+          )
+
+          if (filteredAgentIds.length > 0) {
+            return filteredAgentIds
+          }
+
+          return downloadedAgentData.slice(0, 2).map((agent) => agent.id)
         })
       } catch (error) {
-        console.error('Failed to load composer projects', error)
+        console.error('Failed to load composer data', error)
       }
     }
 
-    void loadProjects()
+    void loadComposerData()
 
     const handleProjectCreated = () => {
-      void loadProjects(true)
+      void loadComposerData(true)
+    }
+    const handleAgentsChanged = () => {
+      void loadComposerData(true)
     }
 
     window.addEventListener('project-created', handleProjectCreated)
+    window.addEventListener('agents-changed', handleAgentsChanged)
 
     return () => {
       active = false
       window.removeEventListener('project-created', handleProjectCreated)
+      window.removeEventListener('agents-changed', handleAgentsChanged)
     }
   }, [])
 
@@ -268,7 +277,7 @@ function PromptComposer({ onSendPrompt, isDevelopingProps }: PromptComposerProps
                 >
                   <div className="flex -space-x-1.5 pointer-events-none" aria-hidden="true">
                     {selectedAgents.map((agentId) => {
-                      const agent = agentsList.find((a) => a.id === agentId)
+                      const agent = downloadedAgents.find((a) => a.id === agentId)
                       if (!agent) return null
                       return (
                         <div key={agent.id} className="w-5 h-5 rounded-md bg-surface-container-highest flex items-center justify-center border border-background">
@@ -281,7 +290,7 @@ function PromptComposer({ onSendPrompt, isDevelopingProps }: PromptComposerProps
                     {selectedAgents.length === 0
                       ? 'No Agents'
                       : selectedAgents.length === 1
-                      ? agentsList.find((a) => a.id === selectedAgents[0])?.label
+                      ? downloadedAgents.find((a) => a.id === selectedAgents[0])?.name
                       : 'Agents'}
                   </span>
                   {selectedAgents.length > 2 && (
@@ -294,7 +303,11 @@ function PromptComposer({ onSendPrompt, isDevelopingProps }: PromptComposerProps
 
                 {isAgentDropdownOpen && (
                   <div className="absolute left-0 bottom-full mb-2 z-50 min-w-[200px] bg-surface-container-low border border-outline-variant rounded-[12px] p-2 shadow-xl flex flex-col gap-1">
-                    {agentsList.map((agent) => {
+                    {downloadedAgents.length === 0 ? (
+                      <div className="px-3 py-2 text-[12px] text-on-surface-variant">
+                        Download agents from Marketplace first.
+                      </div>
+                    ) : downloadedAgents.map((agent) => {
                       const isSelected = selectedAgents.includes(agent.id)
                       return (
                         <div
@@ -312,7 +325,7 @@ function PromptComposer({ onSendPrompt, isDevelopingProps }: PromptComposerProps
                             {isSelected ? 'check_box' : 'check_box_outline_blank'}
                           </span>
                           <span className="material-symbols-outlined text-[16px]">{agent.icon}</span>
-                          <span className="font-body-sm">{agent.label}</span>
+                          <span className="font-body-sm">{agent.name}</span>
                         </div>
                       )
                     })}
@@ -327,11 +340,11 @@ function PromptComposer({ onSendPrompt, isDevelopingProps }: PromptComposerProps
               </button>
               <button
                 className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
-                  !prompt.trim() || !selectedProjectId || isDeveloping
+                  !prompt.trim() || !selectedProjectId || selectedAgents.length === 0 || isDeveloping
                     ? 'bg-on-surface-variant/20 text-on-surface-variant/40 cursor-not-allowed'
                     : 'bg-primary text-on-primary hover:bg-opacity-90 active:scale-95'
                 }`}
-                disabled={!prompt.trim() || !selectedProjectId || isDeveloping}
+                disabled={!prompt.trim() || !selectedProjectId || selectedAgents.length === 0 || isDeveloping}
                 type="button"
                 aria-label="Send prompt"
                 onClick={handleSend}
@@ -419,4 +432,3 @@ function PromptComposer({ onSendPrompt, isDevelopingProps }: PromptComposerProps
 }
 
 export default PromptComposer
-

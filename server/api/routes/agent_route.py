@@ -1,4 +1,9 @@
+from uuid import UUID
+
 from fastapi import APIRouter
+
+from config.contant import DEV_USER_ID
+from db.user_agent import UserAgentRepository
 
 from db.database import database
 
@@ -6,6 +11,8 @@ router = APIRouter(
     prefix="/agents",
     tags=["Agents"]
 )
+
+user_agent_repository = UserAgentRepository(database)
 
 AGENT_METADATA = {
     "204cfaf9-aa29-430f-9309-4a97e81e7791": {
@@ -128,6 +135,7 @@ async def get_agents():
     try:
         agent_rows = await conn.fetch("SELECT * FROM agents")
         source_rows = await conn.fetch("SELECT agent_id, url FROM agent_sources WHERE is_active = TRUE")
+        downloaded_agent_ids = await user_agent_repository.get_downloaded_agent_ids(conn, DEV_USER_ID)
         
         sources_by_agent = {}
         for s in source_rows:
@@ -169,10 +177,35 @@ async def get_agents():
                 "category": metadata["category"],
                 "synced": metadata["synced"],
                 "installs": metadata["installs"],
-                "createdAt": agent_dict.get("created_at"),
-                "syncedAt": agent_dict.get("last_kb_update") or agent_dict.get("updated_at"),
+                "createdAt": agent_dict.get("created_at").isoformat() if agent_dict.get("created_at") else None,
+                "syncedAt": (
+                    agent_dict.get("last_kb_update") or agent_dict.get("updated_at")
+                ).isoformat() if (agent_dict.get("last_kb_update") or agent_dict.get("updated_at")) else None,
+                "downloaded": agent_id_str in downloaded_agent_ids,
             })
             
         return agents
+    finally:
+        await database.release_conn(conn)
+
+
+@router.post("/{agent_id}/download")
+async def download_agent(agent_id: UUID):
+    conn = await database.get_conn()
+    try:
+        async with conn.transaction():
+            await user_agent_repository.download_agent(conn, DEV_USER_ID, str(agent_id))
+        return {"status": "downloaded", "agent_id": str(agent_id)}
+    finally:
+        await database.release_conn(conn)
+
+
+@router.delete("/{agent_id}/download")
+async def uninstall_agent(agent_id: UUID):
+    conn = await database.get_conn()
+    try:
+        async with conn.transaction():
+            await user_agent_repository.uninstall_agent(conn, DEV_USER_ID, str(agent_id))
+        return {"status": "uninstalled", "agent_id": str(agent_id)}
     finally:
         await database.release_conn(conn)

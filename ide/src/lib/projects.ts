@@ -126,7 +126,11 @@ export async function getChatDetail(sessionId: string): Promise<ChatDetail> {
 }
 
 
-export async function developProject(projectId: string, prompt: string): Promise<any> {
+export async function developProject(
+  projectId: string,
+  prompt: string,
+  selectedAgentIds: string[]
+): Promise<any> {
   const response = await fetch(`${API_BASE_URL.replace(/\/$/, '')}/projects/develop`, {
     method: 'POST',
     headers: {
@@ -135,6 +139,7 @@ export async function developProject(projectId: string, prompt: string): Promise
     body: JSON.stringify({
       project_id: projectId,
       prompt: prompt,
+      selected_agent_ids: selectedAgentIds,
     }),
   })
 
@@ -156,6 +161,7 @@ export async function developProject(projectId: string, prompt: string): Promise
 export async function developProjectStream(
   projectId: string,
   prompt: string,
+  selectedAgentIds: string[],
   onChunk: (chunk: any) => void
 ): Promise<void> {
   const response = await fetch(`${API_BASE_URL.replace(/\/$/, '')}/projects/develop`, {
@@ -166,6 +172,7 @@ export async function developProjectStream(
     body: JSON.stringify({
       project_id: projectId,
       prompt: prompt,
+      selected_agent_ids: selectedAgentIds,
     }),
   })
 
@@ -262,4 +269,4 @@ export async function saveFileContent(projectId: string, path: string, content: 
 
 export function getDownloadUrl(projectId: string): string {
   return `${API_BASE_URL.replace(/\/$/, '')}/workspace/${projectId}/download`
-}
+}

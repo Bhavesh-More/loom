@@ -74,6 +74,7 @@ from tools.file_tools import parse_agent_output
 class DevelopProjectRequest(BaseModel):
     project_id: UUID
     prompt: str
+    selected_agent_ids: list[UUID] = []
 
 chat_repository = ChatRepository(database)
 
@@ -90,12 +91,14 @@ async def develop_project(request: DevelopProjectRequest):
                 yield json.dumps({"type": "error", "message": "Project not found"}) + "\n"
                 return
 
-            # 2. Get agents linked to this project
-            agent_ids = await project_service.project_agent_repository.get_project_agents(conn, str(request.project_id))
+            # 2. Get agents selected for this run, falling back to project-linked agents
+            agent_ids = [str(agent_id) for agent_id in request.selected_agent_ids]
+            if not agent_ids:
+                agent_ids = await project_service.project_agent_repository.get_project_agents(conn, str(request.project_id))
             if not agent_ids:
                 yield json.dumps({
                     "type": "error",
-                    "message": "No agents are linked to this project. Go to the Marketplace and add agents to your team for this project first."
+                    "message": "No agents selected. Download agents from the Marketplace and select them before running."
                 }) + "\n"
                 return
 

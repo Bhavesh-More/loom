@@ -1,40 +1,23 @@
 import MaterialIcon from './MaterialIcon'
-import type { AgentCategory } from '../lib/marketplace'
-
-export type AgentCardData = {
-  id: string
-  name: string
-  version: string
-  type: 'Core' | 'Community'
-  rating: string
-  icon: string
-  tone: 'amber' | 'green' | 'blue' | 'violet' | 'sky' | 'rose'
-  description: string
-  sources: string[]
-  synced: string
-  installs: string
-  category: AgentCategory
-  createdAt: string | null
-  syncedAt: string | null
-}
+import type { AgentData } from '../lib/agents'
 
 type AgentCardProps = {
-  agent: AgentCardData
-  isSelected: boolean
-  onAddToTeam: (agent: AgentCardData) => void
-  onRemoveFromTeam: (agentName: string) => void
+  agent: AgentData
+  isPending?: boolean
+  onDownload: (agentId: string) => void
+  onUninstall: (agentId: string) => void
 }
 
 function AgentCard({
   agent,
-  isSelected,
-  onAddToTeam,
-  onRemoveFromTeam,
+  isPending = false,
+  onDownload,
+  onUninstall,
 }: AgentCardProps) {
   return (
     <article
       className={`agent-card${agent.type === 'Community' ? ' agent-card--community' : ''}${
-        isSelected ? ' agent-card--selected' : ''
+        agent.downloaded ? ' agent-card--selected' : ''
       }`}
     >
       <div className="agent-card__header">
@@ -78,20 +61,34 @@ function AgentCard({
 
       <div className="agent-card__actions">
         <button
-          className={isSelected ? 'agent-card__team-button--selected' : undefined}
+          className={agent.downloaded ? 'agent-card__team-button--selected' : undefined}
           type="button"
-          onClick={() =>
-            isSelected ? onRemoveFromTeam(agent.name) : onAddToTeam(agent)
-          }
+          onClick={() => {
+            if (!agent.downloaded) {
+              onDownload(agent.id)
+            }
+          }}
+          disabled={isPending}
         >
           <span className="agent-card__team-label">
-            {isSelected ? 'In Team' : 'Add to Team'}
+            {isPending ? 'Working...' : agent.downloaded ? 'Downloaded' : 'Download'}
           </span>
-          {isSelected ? (
-            <span className="agent-card__team-remove-label">Remove from Team</span>
+          {agent.downloaded ? (
+            <span className="agent-card__team-remove-label">Installed in your workspace</span>
           ) : null}
         </button>
-        <a href="#">Details</a>
+        {agent.downloaded ? (
+          <button
+            type="button"
+            className="agent-card__secondary-action"
+            onClick={() => onUninstall(agent.id)}
+            disabled={isPending}
+          >
+            Uninstall
+          </button>
+        ) : (
+          <a href="#">Details</a>
+        )}
       </div>
     </article>
   )

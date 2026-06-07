@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { getProjects, getChats, type Project, type Chat } from '../lib/projects'
+import { getDownloadedAgents, type AgentData } from '../lib/agents'
 
 export type AppPage = 'chat' | 'marketplace'
 
@@ -13,6 +14,7 @@ type SidebarProps = {
 function Sidebar({ activePage, onNavigate, activeChatId, onSelectChat }: SidebarProps) {
   const [projects, setProjects] = useState<Project[]>([])
   const [chats, setChats] = useState<Chat[]>([])
+  const [downloadedAgents, setDownloadedAgents] = useState<AgentData[]>([])
   const [isAddingProject, setIsAddingProject] = useState(false)
   const [newProjectPath, setNewProjectPath] = useState('')
   const [newProjectName, setNewProjectName] = useState('')
@@ -23,13 +25,15 @@ function Sidebar({ activePage, onNavigate, activeChatId, onSelectChat }: Sidebar
 
     async function loadData(force = false) {
       try {
-        const [projectData, chatData] = await Promise.all([
+        const [projectData, chatData, downloadedAgentData] = await Promise.all([
           getProjects(force),
           getChats(force),
+          getDownloadedAgents(force),
         ])
         if (active) {
           setProjects(projectData)
           setChats(chatData)
+          setDownloadedAgents(downloadedAgentData)
         }
       } catch (error) {
         console.error('Failed to fetch sidebar data', error)
@@ -40,14 +44,17 @@ function Sidebar({ activePage, onNavigate, activeChatId, onSelectChat }: Sidebar
 
     const handleProjectCreated = () => void loadData(true)
     const handleChatCreated = () => void loadData(true)
+    const handleAgentsChanged = () => void loadData(true)
 
     window.addEventListener('project-created', handleProjectCreated)
     window.addEventListener('chat-created', handleChatCreated)
+    window.addEventListener('agents-changed', handleAgentsChanged)
 
     return () => {
       active = false
       window.removeEventListener('project-created', handleProjectCreated)
       window.removeEventListener('chat-created', handleChatCreated)
+      window.removeEventListener('agents-changed', handleAgentsChanged)
     }
   }, [])
 
@@ -249,6 +256,53 @@ function Sidebar({ activePage, onNavigate, activeChatId, onSelectChat }: Sidebar
               </div>
             )}
 
+            <div className="mt-5 px-4 mb-2">
+              <span className="font-label-caps text-label-caps text-on-surface-variant opacity-70 text-[11px] tracking-widest ">
+                Agents
+              </span>
+            </div>
+
+            {downloadedAgents.length > 0 ? (
+              <div className="px-3 flex flex-col gap-2">
+                {downloadedAgents.slice(0, 4).map((agent) => (
+                  <div
+                    key={agent.id}
+                    className="rounded-xl border border-outline-variant/30 bg-surface-container-low px-3 py-3"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`market-icon market-icon--${agent.tone} !w-10 !h-10 !rounded-lg shrink-0`}>
+                        <span className="material-symbols-outlined text-[18px]">{agent.icon}</span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[12px] font-medium text-on-surface truncate">
+                            {agent.name}
+                          </span>
+                          <span className="text-[10px] text-primary shrink-0">Downloaded</span>
+                        </div>
+                        <div className="mt-1 text-[10px] text-on-surface-variant">
+                          {agent.category} · {agent.type}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {downloadedAgents.length > 4 ? (
+                  <button
+                    className="text-left px-2 py-1 text-[11px] text-on-surface-variant hover:text-primary transition-colors"
+                    onClick={() => onNavigate('marketplace')}
+                    type="button"
+                  >
+                    View all {downloadedAgents.length} agents
+                  </button>
+                ) : null}
+              </div>
+            ) : (
+              <span className="px-4 py-1.5 text-[12px] text-on-surface-variant italic">
+                No agents downloaded yet
+              </span>
+            )}
+
 
             {/* ── Chats ─────────────────────────────────────────── */}
             <div className="mt-5 px-4 mb-1">
@@ -293,14 +347,7 @@ function Sidebar({ activePage, onNavigate, activeChatId, onSelectChat }: Sidebar
 
       {/* Footer */}
       <div className="marketplace-sidebar-footer mt-auto border-t border-outline-variant py-2">
-        <button
-          className="marketplace-sidebar-action"
-          onClick={() => onNavigate('marketplace')}
-          type="button"
-        >
-          <span className="material-symbols-outlined text-[18px]">add_circle</span>
-          <span>Create Agent</span>
-        </button>
+
         <a
           className="flex items-center gap-3 text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary px-4 py-2 transition-all font-body-sm text-body-sm hover:bg-surface-container-highest dark:hover:bg-surface-container-high"
           href="#"

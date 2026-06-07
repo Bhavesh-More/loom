@@ -13,6 +13,7 @@ cur = conn.cursor()
 
 cur.execute("""
 TRUNCATE TABLE
+    user_agents,
     project_agents,
     projects,
     agent_sources,
