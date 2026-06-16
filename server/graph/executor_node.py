@@ -51,6 +51,9 @@ def executor_node(state: LoomState) -> LoomState:
 Project Goal: {state['goal']}
 
 Your specific task: {task}
+
+Precomputed repository context:
+{state.get('context_payload_text', '')}
 {context_block}
 
 Generate the code now.

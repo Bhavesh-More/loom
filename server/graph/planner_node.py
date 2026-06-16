@@ -54,6 +54,9 @@ Project Goal: {state['goal']}
 
 Agents to plan for (ONLY these, do not add others): {json.dumps(agents_to_plan)}
 
+Precomputed repository context payload:
+{state.get('context_payload_text', '')}
+
 Tier Map for these agents:
 {json.dumps(tier_context, indent=2)}
 

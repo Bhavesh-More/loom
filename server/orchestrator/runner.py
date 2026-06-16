@@ -1,6 +1,8 @@
 import uuid
+import asyncio
 from graph.builder import loom_graph
 from graph.state import LoomState
+from services.workspace_service import WorkspaceService
 
 
 def run_project(
@@ -36,8 +38,10 @@ def run_project(
         "execution_plan":  [],
         "current_step":    0,
         "agent_outputs":   {},
-        "workspace_path":  "",
+        "workspace_path":  str(WorkspaceService().get_workspace_path(project_name)),
         "errors":          [],
+        "context_payload": {},
+        "context_payload_text": "",
     }
 
     print(f"\n{'='*60}")
@@ -47,7 +51,7 @@ def run_project(
     print(f"  Goal       : {goal[:100]}{'...' if len(goal) > 100 else ''}")
     print(f"{'='*60}\n")
 
-    final_state = loom_graph.invoke(initial_state)
+    final_state = asyncio.run(loom_graph.ainvoke(initial_state))
 
     print(f"\n{'='*60}")
     print(f"  LOOM — Done!")
