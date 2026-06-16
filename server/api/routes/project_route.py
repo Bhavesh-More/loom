@@ -40,6 +40,7 @@ async def get_projects():
 from pydantic import BaseModel
 from graph.builder import loom_graph
 from db.database import database
+from dependencies.workspace_dep import workspace_service
 
 def get_agent_key(agent_id_str: str, agent_name: str) -> str:
     # Explicit mapping by ID
@@ -148,8 +149,10 @@ async def develop_project(request: DevelopProjectRequest):
                 "execution_plan": [],
                 "current_step": 0,
                 "agent_outputs": {},
-                "workspace_path": "",
-                "errors": []
+                "workspace_path": str(workspace_service.get_workspace_path(project["name"])),
+                "errors": [],
+                "context_payload": {},
+                "context_payload_text": ""
             }
 
             yield json.dumps({

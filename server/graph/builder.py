@@ -7,6 +7,7 @@ from graph.qa_node import qa_node
 from graph.planner_node import planner_node
 from graph.router_node import router_node
 from graph.file_writer_node import file_writer_node
+from context_system.langgraph_node import context_understanding_node_async
 
 # ---------------------------------------------------------------------------
 # Conditional edge: router decision
@@ -49,6 +50,8 @@ def build_graph() -> StateGraph:
     Flow:
         START
           ↓
+        context_understanding
+          ↓
         router
           ├─ "qa"      → qa_node → END
           └─ "codegen" → planner
@@ -67,13 +70,15 @@ def build_graph() -> StateGraph:
 
     # Register all nodes
     graph.add_node("router",      router_node)
+    graph.add_node("context_understanding", context_understanding_node_async)
     graph.add_node("qa",          qa_node)
     graph.add_node("planner",     planner_node)
     graph.add_node("executor",    executor_node)
     graph.add_node("file_writer", file_writer_node)
 
-    # Entry point is always the router
-    graph.set_entry_point("router")
+    # Entry point first builds reusable repo context for downstream agents.
+    graph.set_entry_point("context_understanding")
+    graph.add_edge("context_understanding", "router")
 
     # router → qa or planner
     graph.add_conditional_edges(

@@ -26,3 +26,5 @@ class LoomState(TypedDict):
     agent_outputs: dict[str, str]
     workspace_path: str
     errors: list[str]
+    context_payload: dict
+    context_payload_text: str
