@@ -54,6 +54,10 @@ Your specific task: {task}
 
 Precomputed repository context:
 {state.get('context_payload_text', '')}
+
+Use the relevant files, relationships, and change_surface above as your primary
+repo map. Do not repeat broad repo scanning in your answer; write code against
+this context and only infer missing details when the context has an explicit gap.
 {context_block}
 
 Generate the code now.

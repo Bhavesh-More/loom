@@ -9,6 +9,7 @@ The user has a project with a team of AI agents that will generate code for them
 Your job is to answer their question clearly and helpfully based on:
 - The project goal they described
 - The agents that are part of their team
+- The precomputed repository context, when available
 - General software engineering knowledge
 
 Be concise, direct, and practical. If they ask how to start, give them clear actionable steps.
@@ -35,6 +36,9 @@ def qa_node(state: LoomState) -> LoomState:
 Project Goal: {state['goal']}
 
 Team Agents: {', '.join(state['selected_agents'])}
+
+Precomputed repository context:
+{state.get('context_payload_text', '')}
 
 User Question: {state['goal']}
 """

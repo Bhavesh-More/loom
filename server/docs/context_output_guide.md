@@ -19,6 +19,10 @@ This guide explains how to read the JSON returned by the Project-Aware Context U
 
 ## Routes And Their Output
 
+The same context system also runs automatically during normal Loom agent execution.
+The LangGraph flow prepares context before routing, planning, QA, or executor nodes run.
+When the workspace does not exist yet, the system returns an empty context payload and lets first-time generation continue.
+
 ### `POST /context/analyze`
 
 Input:
@@ -167,3 +171,4 @@ A good response usually:
 - Add a lightweight similarity index for memory lookup so later requests can match faster.
 - Add route-specific confidence thresholds so `change_surface` only includes files that are already in `files`.
 - Add UI tests or backend smoke tests for the most common task types after context analysis.
+- Re-index the workspace after file writing so newly generated files are immediately available to the next request.
