@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Renderer, Program, Mesh, Triangle } from 'ogl';
 import './Grainient.css';
 
-const hexToRgb = hex => {
+const hexToRgb = (hex: string): [number, number, number] => {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   if (!result) return [1, 1, 1];
   return [parseInt(result[1], 16) / 255, parseInt(result[2], 16) / 255, parseInt(result[3], 16) / 255];
@@ -102,7 +102,13 @@ void main(){
 
 // Keep renderer/program alive across re-renders so Effect 2 can update
 // uniforms without ever rebuilding the WebGL context.
-const ctxMap = new WeakMap();
+type GrainientContext = {
+  renderer: any;
+  program: any;
+  mesh: any;
+};
+
+const ctxMap = new WeakMap<HTMLDivElement, GrainientContext>();
 
 const Grainient = ({
   timeSpeed = 0.25,
@@ -129,7 +135,7 @@ const Grainient = ({
   color3 = '#B497CF',
   className = ''
 }) => {
-  const containerRef = useRef(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   // Effect 1: build WebGL context once, pause when offscreen / tab hidden
   useEffect(() => {
@@ -144,7 +150,7 @@ const Grainient = ({
     });
 
     const gl = renderer.gl;
-    const canvas = gl.canvas;
+    const canvas = gl.canvas as HTMLCanvasElement;
     canvas.style.width = '100%';
     canvas.style.height = '100%';
     canvas.style.display = 'block';
@@ -204,7 +210,7 @@ const Grainient = ({
     let isPageVisible = !document.hidden;
     const t0 = performance.now();
 
-    const loop = t => {
+    const loop = (t: number) => {
       program.uniforms.iTime.value = (t - t0) * 0.001;
       renderer.render({ scene: mesh });
       raf = requestAnimationFrame(loop);

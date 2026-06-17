@@ -92,6 +92,18 @@ class ChatRepository:
                 content
             )
 
+    async def touch_chat_session(
+        self,
+        conn,
+        session_id: str
+    ):
+        query = """
+        UPDATE chat_sessions
+        SET updated_at = NOW()
+        WHERE id = $1
+        """
+        await conn.execute(query, session_id)
+
     async def get_chat_session(
         self,
         conn,
@@ -134,4 +146,3 @@ class ChatRepository:
                     pass
             res.append(d)
         return res
-

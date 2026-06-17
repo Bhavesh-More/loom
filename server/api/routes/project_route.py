@@ -76,6 +76,7 @@ class DevelopProjectRequest(BaseModel):
     project_id: UUID
     prompt: str
     selected_agent_ids: list[UUID] = []
+    chat_session_id: UUID | None = None
 
 chat_repository = ChatRepository(database)
 
@@ -118,9 +119,21 @@ async def develop_project(request: DevelopProjectRequest):
                 yield json.dumps({"type": "error", "message": "Assigned agents could not be mapped to Loom execution keys."}) + "\n"
                 return
 
-            # Create a chat session in the DB
-            chat_session = await chat_repository.create_chat_session(conn, str(request.project_id), request.prompt)
-            chat_session_id = chat_session["id"]
+            # Create a chat session for a new chat, or append to the active one for follow-up prompts.
+            if request.chat_session_id:
+                existing_session = await chat_repository.get_chat_session(conn, str(request.chat_session_id))
+                if not existing_session:
+                    yield json.dumps({"type": "error", "message": "Chat session not found"}) + "\n"
+                    return
+                if str(existing_session["project_id"]) != str(request.project_id):
+                    yield json.dumps({"type": "error", "message": "Chat session does not belong to the selected project"}) + "\n"
+                    return
+                chat_session = existing_session
+                chat_session_id = chat_session["id"]
+                await chat_repository.touch_chat_session(conn, str(chat_session_id))
+            else:
+                chat_session = await chat_repository.create_chat_session(conn, str(request.project_id), request.prompt)
+                chat_session_id = chat_session["id"]
 
             # Initialize messages buffer with user prompt and starting event
             messages_to_insert.append({
@@ -146,13 +159,17 @@ async def develop_project(request: DevelopProjectRequest):
                 "project_name": project["name"],
                 "goal": request.prompt,
                 "selected_agents": selected_agents,
+                "active_agents": [],
+                "query_type": "",
+                "qa_response": "",
                 "execution_plan": [],
                 "current_step": 0,
                 "agent_outputs": {},
                 "workspace_path": str(workspace_service.get_workspace_path(project["name"])),
                 "errors": [],
                 "context_payload": {},
-                "context_payload_text": ""
+                "context_payload_text": "",
+                "chat_session_id": str(chat_session_id),
             }
 
             yield json.dumps({
@@ -160,7 +177,8 @@ async def develop_project(request: DevelopProjectRequest):
                 "message": "Starting developer workflow...",
                 "project_name": project["name"],
                 "chat_id": str(chat_session_id),
-                "chat_title": chat_session["title"]
+                "chat_title": chat_session["title"],
+                "is_follow_up": bool(request.chat_session_id)
             }) + "\n"
 
             plan = []
@@ -169,7 +187,29 @@ async def develop_project(request: DevelopProjectRequest):
                 state_update = event[node_name]
                 errors = state_update.get("errors", [])
 
-                if node_name == "planner":
+                if node_name == "context_understanding":
+                    context_payload = state_update.get("context_payload", {})
+                    context_files = context_payload.get("files", []) if isinstance(context_payload, dict) else []
+                    context_gaps = context_payload.get("gaps", []) if isinstance(context_payload, dict) else []
+                    messages_to_insert.append({
+                        "session_id": chat_session_id,
+                        "role": "system",
+                        "message_type": "system_event",
+                        "content": {
+                            "text": f"Repository context prepared with {len(context_files)} relevant file(s).",
+                            "context_file_count": len(context_files),
+                            "context_files": [item.get("path") for item in context_files if isinstance(item, dict)],
+                            "gaps": context_gaps,
+                            "errors": errors
+                        }
+                    })
+                    yield json.dumps({
+                        "type": "context",
+                        "message": f"Repository context prepared with {len(context_files)} relevant file(s).",
+                        "file_count": len(context_files),
+                        "errors": errors
+                    }) + "\n"
+                elif node_name == "planner":
                     plan = state_update.get("execution_plan", [])
                     messages_to_insert.append({
                         "session_id": chat_session_id,
@@ -248,6 +288,22 @@ async def develop_project(request: DevelopProjectRequest):
                         "type": "file_writer",
                         "message": "Writing outputs to disk.",
                         "workspace_path": workspace_path,
+                        "errors": errors
+                    }) + "\n"
+                elif node_name == "qa":
+                    qa_response = state_update.get("qa_response", "")
+                    messages_to_insert.append({
+                        "session_id": chat_session_id,
+                        "role": "assistant",
+                        "message_type": "text",
+                        "content": {
+                            "text": qa_response,
+                            "errors": errors
+                        }
+                    })
+                    yield json.dumps({
+                        "type": "qa",
+                        "message": qa_response,
                         "errors": errors
                     }) + "\n"
 

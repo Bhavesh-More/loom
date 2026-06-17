@@ -56,11 +56,13 @@ class ProjectReader:
         selected = self._dedupe_matches([*await self._discover_likely_files(repo_path, prompt), *selected])
         searched_terms: set[str] = set()
         ranked: list[dict] = []
+        payload_by_path: dict[str, dict] = {}
 
         for _round in range(self.max_rounds):
             selected = selected[: self.max_files]
             file_payloads = await asyncio.gather(*(self._read_candidate(match) for match in selected))
             file_payloads = [payload for payload in file_payloads if payload["content"]]
+            payload_by_path.update({payload["path"]: payload for payload in file_payloads})
             if not file_payloads:
                 break
 
@@ -90,7 +92,7 @@ class ProjectReader:
         chunks: list[RankedChunk] = []
         for item in ranked:
             path = item["path"]
-            source = next((payload for payload in file_payloads if payload["path"] == path), None)
+            source = payload_by_path.get(path)
             if not source:
                 continue
             section = self._section_from_lines(
@@ -179,6 +181,21 @@ class ProjectReader:
         if not names:
             return []
 
+        async def _rg_files() -> list[str]:
+            args = ["rg", "--files"]
+            for glob in IGNORE_GLOBS:
+                args.extend(["--glob", glob])
+            args.append(repo_path)
+            proc = await asyncio.create_subprocess_exec(
+                *args,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, _stderr = await proc.communicate()
+            if proc.returncode not in (0, 1):
+                return []
+            return [line for line in stdout.decode().splitlines() if line.strip()]
+
         def _find() -> list[FileMatch]:
             root = Path(repo_path)
             wanted = {name.lower() for name in names}
@@ -191,6 +208,24 @@ class ProjectReader:
                         FileMatch(
                             path=str(path.resolve()),
                             score=0.78 + self._path_boost(str(path), prompt),
+                            snippets=["Likely entry point or UI surface inferred from repo shape."],
+                            matched_terms=["repo-shape"],
+                        )
+                    )
+            return matches
+
+        wanted = {name.lower() for name in names}
+        rg_paths = await _rg_files()
+        if rg_paths:
+            matches = []
+            for raw_path in rg_paths:
+                path = Path(raw_path)
+                absolute = path if path.is_absolute() else Path(repo_path) / path
+                if absolute.name.lower() in wanted and not self._is_low_value_path(str(absolute)):
+                    matches.append(
+                        FileMatch(
+                            path=str(absolute.resolve()),
+                            score=0.78 + self._path_boost(str(absolute), prompt),
                             snippets=["Likely entry point or UI surface inferred from repo shape."],
                             matched_terms=["repo-shape"],
                         )

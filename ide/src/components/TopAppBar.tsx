@@ -3,9 +3,11 @@ type TopAppBarProps = {
   projectName?: string
   prompt?: string
   isSessionActive?: boolean
+  isWorkspaceOpen?: boolean
+  onToggleWorkspace?: () => void
 }
 
-function TopAppBar({ projectName, prompt, isSessionActive }: TopAppBarProps) {
+function TopAppBar({ projectName, prompt, isSessionActive, isWorkspaceOpen = true, onToggleWorkspace }: TopAppBarProps) {
   if (isSessionActive) {
     return (
       <header className="h-14 flex items-center justify-between px-6 border-b border-[#262626] bg-[#0A0A0A] shrink-0 w-full z-10">
@@ -24,7 +26,13 @@ function TopAppBar({ projectName, prompt, isSessionActive }: TopAppBarProps) {
             <button className="p-1.5 text-on-surface-variant hover:text-white rounded hover:bg-[#262626] transition-colors" type="button" aria-label="Information">
               <span className="material-symbols-outlined text-[18px]">info</span>
             </button>
-            <button className="p-1.5 text-on-surface-variant hover:text-white rounded hover:bg-[#262626] transition-colors" type="button" aria-label="Dock to right">
+            <button
+              className="p-1.5 text-on-surface-variant hover:text-white rounded hover:bg-[#262626] transition-colors"
+              type="button"
+              aria-label={isWorkspaceOpen ? 'Hide workspace explorer' : 'Show workspace explorer'}
+              title={isWorkspaceOpen ? 'Hide workspace explorer' : 'Show workspace explorer'}
+              onClick={onToggleWorkspace}
+            >
               <span className="material-symbols-outlined text-[18px]">dock_to_right</span>
             </button>
           </div>
