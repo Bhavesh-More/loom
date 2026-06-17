@@ -39,6 +39,9 @@ AGENT_FOLDER_MAP: dict[str, dict[str, str]] = {
     # ── Tests (backend/tests/) ───────────────────────────────────────────
     "pytest":         {"base": "backend", "subdir": "tests"},
 
+    # ── Generic work (backend/misc/) ─────────────────────────────────────
+    "all_rounder":    {"base": "backend", "subdir": "misc"},
+
     # ── Infrastructure (backend/infra/) ──────────────────────────────────
     "docker":         {"base": "backend", "subdir": "infra"},
     "github_actions": {"base": "backend", "subdir": "infra"},

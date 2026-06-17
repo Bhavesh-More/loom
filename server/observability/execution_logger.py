@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import time
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -10,6 +11,7 @@ from typing import Any
 
 LOG_DIR = Path(__file__).resolve().parents[1] / "logs"
 LOG_FILE = LOG_DIR / "loom_context_runs.jsonl"
+LOG_ENABLED = os.getenv("LOOM_CONTEXT_LOGS", "").lower() in {"1", "true", "yes", "on"}
 MAX_FIELD_CHARS = 120_000
 
 
@@ -18,6 +20,8 @@ def _logger() -> logging.Logger:
     logger = logging.getLogger("loom.execution_trace")
     logger.setLevel(logging.INFO)
     logger.propagate = False
+    if not LOG_ENABLED:
+        return logger
     if not logger.handlers:
         handler = RotatingFileHandler(
             LOG_FILE,
@@ -44,6 +48,8 @@ def compact(value: Any, limit: int = MAX_FIELD_CHARS) -> Any:
 
 
 def log_execution_event(tag: str, payload: dict[str, Any]) -> None:
+    if not LOG_ENABLED:
+        return
     record = {
         "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "tag": tag,

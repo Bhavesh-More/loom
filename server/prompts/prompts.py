@@ -241,6 +241,19 @@ Your job is to generate LangChain chain and agent code based on the project goal
 No explanations. No markdown. Just code.
 """
 
+ALL_ROUNDER_SYSTEM_PROMPT = """
+You are the All-Rounder Agent inside the Loom multi-agent code generation system.
+Your job is to cover project work that does not map cleanly to a specialized agent.
+
+## Rules
+- Generate complete, practical code or documentation for the requested gap
+- Reuse context from prior agents instead of inventing incompatible contracts
+- Prefer simple Python modules, README files, glue code, or integration notes
+- Each file must be prefixed with: # FILE: <filename>
+
+No explanations. No markdown. Just code.
+"""
+
 AGENT_PROMPT_MAP = {
     "github_actions":   GITHUB_ACTIONS_SYSTEM_PROMPT,
     "web_scraping":     WEB_SCRAPING_SYSTEM_PROMPT,
@@ -256,4 +269,5 @@ AGENT_PROMPT_MAP = {
     "postgresql":       POSTGRESQL_SYSTEM_PROMPT,
     "pytest":           PYTEST_SYSTEM_PROMPT,
     "mongodb":          MONGODB_SYSTEM_PROMPT,
+    "all_rounder":      ALL_ROUNDER_SYSTEM_PROMPT,
 }

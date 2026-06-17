@@ -6,6 +6,9 @@ asyncpg
 fastapi
 uvicorn
 pydantic
+redis
+sqlparse
+pydantic>=2.0
 requests
 streamlit
 sentence-transformers>=2.2.0
