@@ -1,4 +1,3 @@
-import MaterialIcon from './MaterialIcon'
 import {
   MARKETPLACE_FILTERS,
   MARKETPLACE_SORT_OPTIONS,

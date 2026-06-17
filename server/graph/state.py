@@ -28,3 +28,4 @@ class LoomState(TypedDict):
     errors: list[str]
     context_payload: dict
     context_payload_text: str
+    chat_session_id: str

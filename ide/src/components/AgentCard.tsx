@@ -1,6 +1,8 @@
 import MaterialIcon from './MaterialIcon'
 import type { AgentData } from '../lib/agents'
 
+export type AgentCardData = AgentData
+
 type AgentCardProps = {
   agent: AgentData
   isPending?: boolean

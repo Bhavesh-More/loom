@@ -129,7 +129,8 @@ export async function getChatDetail(sessionId: string): Promise<ChatDetail> {
 export async function developProject(
   projectId: string,
   prompt: string,
-  selectedAgentIds: string[]
+  selectedAgentIds: string[],
+  chatSessionId?: string | null
 ): Promise<any> {
   const response = await fetch(`${API_BASE_URL.replace(/\/$/, '')}/projects/develop`, {
     method: 'POST',
@@ -140,6 +141,7 @@ export async function developProject(
       project_id: projectId,
       prompt: prompt,
       selected_agent_ids: selectedAgentIds,
+      chat_session_id: chatSessionId || null,
     }),
   })
 
@@ -162,7 +164,8 @@ export async function developProjectStream(
   projectId: string,
   prompt: string,
   selectedAgentIds: string[],
-  onChunk: (chunk: any) => void
+  onChunk: (chunk: any) => void,
+  chatSessionId?: string | null
 ): Promise<void> {
   const response = await fetch(`${API_BASE_URL.replace(/\/$/, '')}/projects/develop`, {
     method: 'POST',
@@ -173,6 +176,7 @@ export async function developProjectStream(
       project_id: projectId,
       prompt: prompt,
       selected_agent_ids: selectedAgentIds,
+      chat_session_id: chatSessionId || null,
     }),
   })
 

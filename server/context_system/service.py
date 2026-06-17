@@ -19,6 +19,7 @@ from context_system.project_reader import ProjectReader
 from context_system.repo_orientator import RepoOrientator
 from context_system.semantic_searcher import SemanticSearcher, embedding_provider
 from context_system.subgraph_partitioner import SubgraphPartitioner
+from observability.execution_logger import log_execution_event
 
 
 class ContextUnderstandingSystem:
@@ -47,6 +48,16 @@ class ContextUnderstandingSystem:
             return ContextPayload(task=prompt, files=[], relationships=[], change_surface=[], gaps=[])
         orientation_task = asyncio.create_task(self.orientator.orient(repo_path))
         signals = await self.intent_parser.parse(prompt)
+        log_execution_event(
+            "context.input",
+            {
+                "repo_path": repo_path,
+                "task_id": task_id,
+                "prompt": prompt,
+                "signals": signals.model_dump(),
+                "local_embeddings": self._use_local_embeddings(),
+            },
+        )
         memory_terms = signals.grep_terms + re.findall(r"[A-Za-z0-9_]{3,}", prompt)
         memories = await self.db.get_context_memories(repo_path, memory_terms, signals.domain)
 
@@ -87,6 +98,17 @@ class ContextUnderstandingSystem:
         )
         await self._log_observability(repo_path, payload)
         await self._remember_payload(repo_path, prompt, signals.domain, payload)
+        log_execution_event(
+            "context.output",
+            {
+                "repo_path": repo_path,
+                "task_id": task_id,
+                "prompt": prompt,
+                "file_count": len(payload.files),
+                "gap_count": len(payload.gaps),
+                "context_json": payload.model_dump(by_alias=True),
+            },
+        )
         return payload
 
     async def index_repo(self, repo_path: str) -> dict:

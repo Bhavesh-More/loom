@@ -1,14 +1,11 @@
 import { useEffect, useState, useRef } from 'react'
-
-interface RippleEvent extends React.MouseEvent<HTMLButtonElement> {
-  currentTarget: HTMLButtonElement
-}
 import PromptComposer from '../components/PromptComposer'
 import Sidebar, { type AppPage } from '../components/Sidebar'
 import SuggestionGrid from '../components/SuggestionGrid'
 import TopAppBar from '../components/TopAppBar'
 import WorkspacePanel from '../components/WorkspacePanel'
 import { developProjectStream, getChatDetail, type ChatMessage } from '../lib/projects'
+import { getDownloadedAgents, type AgentData } from '../lib/agents'
 
 type WorkspacePageProps = {
   activePage: AppPage
@@ -32,6 +29,8 @@ type ChatSession = {
   elapsedTime: number
   workspacePath: string
   errors: string[]
+  selectedAgentIds: string[]
+  contextFiles: string[]
 }
 
 
@@ -61,8 +60,11 @@ function getFileColorClass(filename: string): string {
 }
 
 function reconstructSessionFromMessages(sessionData: any, messages: ChatMessage[]): ChatSession {
-  // 1. Get user prompt from messages
-  const userMsg = messages.find(m => m.role === 'user' && m.message_type === 'text')
+  const latestUserIndex = findLastIndex(messages, (m) => m.role === 'user' && m.message_type === 'text')
+  const latestPlanIndex = findLastIndex(messages, (m) => m.message_type === 'task_plan')
+
+  // 1. Get the latest user prompt from messages
+  const userMsg = latestUserIndex >= 0 ? messages[latestUserIndex] : undefined
   const prompt = userMsg?.content?.text || sessionData.title || ''
 
   // 2. Get project name from messages or fallback
@@ -73,7 +75,7 @@ function reconstructSessionFromMessages(sessionData: any, messages: ChatMessage[
   let steps: ExecutionStep[] = []
   
   // Find task plan if it exists
-  const planMsg = messages.find(m => m.message_type === 'task_plan')
+  const planMsg = latestPlanIndex >= 0 ? messages[latestPlanIndex] : undefined
   if (planMsg && planMsg.content?.plan) {
     steps = planMsg.content.plan.map((step: any, idx: number) => ({
       step: step.step || idx + 1,
@@ -85,7 +87,9 @@ function reconstructSessionFromMessages(sessionData: any, messages: ChatMessage[
   }
 
   // Apply agent execution updates
-  const executionMsgs = messages.filter(m => m.message_type === 'agent_execution')
+  const executionMsgs = messages.filter((m, index) =>
+    m.message_type === 'agent_execution' && index > latestPlanIndex
+  )
   executionMsgs.forEach(m => {
     const completedIdx = m.content?.completed_step_idx
     if (completedIdx !== undefined && steps[completedIdx]) {
@@ -132,14 +136,68 @@ function reconstructSessionFromMessages(sessionData: any, messages: ChatMessage[
     elapsedTime,
     workspacePath,
     errors,
+    selectedAgentIds: [],
+    contextFiles: [],
   }
+}
+
+function findLastIndex<T>(items: T[], predicate: (item: T, index: number) => boolean): number {
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    if (predicate(items[index], index)) {
+      return index
+    }
+  }
+  return -1
 }
 
 function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
   const [activeSession, setActiveSession] = useState<ChatSession | null>(null)
   const [activeChatId, setActiveChatId] = useState<string | null>(null)
   const [followUpText, setFollowUpText] = useState('')
+  const [followUpPermission, setFollowUpPermission] = useState('auto-review')
+  const [followUpModel, setFollowUpModel] = useState('llama-3.3-70b')
+  const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(true)
   const timerRef = useRef<number | null>(null)
+
+  const [downloadedAgents, setDownloadedAgents] = useState<AgentData[]>([])
+  const [followUpSelectedAgents, setFollowUpSelectedAgents] = useState<string[]>([])
+  const [isAgentDropdownOpen, setIsAgentDropdownOpen] = useState(false)
+  const agentDropdownRef = useRef<HTMLDivElement>(null)
+
+  // Load downloaded agents on mount
+  useEffect(() => {
+    async function loadAgents() {
+      try {
+        const data = await getDownloadedAgents()
+        setDownloadedAgents(data)
+      } catch (err) {
+        console.error("Failed to load agents in WorkspacePage", err)
+      }
+    }
+    void loadAgents()
+  }, [])
+
+  // Close agent dropdown on click outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (agentDropdownRef.current && !agentDropdownRef.current.contains(event.target as Node)) {
+        setIsAgentDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [])
+
+  // Sync selected agents when activeSession changes
+  useEffect(() => {
+    if (activeSession) {
+      setFollowUpSelectedAgents(activeSession.selectedAgentIds || [])
+    } else {
+      setFollowUpSelectedAgents([])
+    }
+  }, [activeSession?.projectId, activeSession?.selectedAgentIds])
 
   // Task 4: Ripple effect helper
   const createRipple = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -175,10 +233,23 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
       elapsedTime: 0,
       workspacePath: '',
       errors: [],
+      selectedAgentIds: [],
+      contextFiles: [],
     })
     try {
       const chatDetail = await getChatDetail(chatId)
       const reconstructed = reconstructSessionFromMessages(chatDetail.session, chatDetail.messages)
+      if (reconstructed.projectId) {
+        try {
+          const projectResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'}/projects/${reconstructed.projectId}`)
+          if (projectResponse.ok) {
+            const projectData = await projectResponse.json()
+            reconstructed.selectedAgentIds = projectData.agent_ids || []
+          }
+        } catch (err) {
+          console.error("Failed to load project agents for chat detail", err)
+        }
+      }
       setActiveSession(reconstructed)
     } catch (err: any) {
       console.error("Failed to load chat details", err)
@@ -190,6 +261,8 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
         elapsedTime: 0,
         workspacePath: '',
         errors: [`Failed to retrieve chat history: ${err.message || 'Unknown error'}`],
+        selectedAgentIds: [],
+        contextFiles: [],
       })
     }
   }
@@ -223,23 +296,29 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
     }
   }, [activeSession?.status])
 
-  const handleSendPrompt = async (
+  const runPrompt = async (
     projectId: string,
     promptText: string,
-    selectedAgentIds: string[]
+    selectedAgentIds: string[],
+    chatSessionId?: string | null
   ) => {
-    setActiveChatId(null)
+    if (!chatSessionId) {
+      setActiveChatId(null)
+    }
     const newSession: ChatSession = {
       projectId: projectId,
       prompt: promptText,
-      projectName: '',
+      projectName: activeSession?.projectId === projectId ? activeSession.projectName : '',
       status: 'planning',
       steps: [],
       elapsedTime: 0,
-      workspacePath: '',
+      workspacePath: activeSession?.projectId === projectId ? activeSession.workspacePath : '',
       errors: [],
+      selectedAgentIds,
+      contextFiles: [],
     }
     setActiveSession(newSession)
+    setIsWorkspaceOpen(true)
 
     try {
       await developProjectStream(projectId, promptText, selectedAgentIds, (chunk) => {
@@ -262,6 +341,10 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
           if (chunk.type === 'start') {
             updated.projectName = chunk.project_name || ''
             updated.status = 'planning'
+          } else if (chunk.type === 'context') {
+            if (chunk.errors && chunk.errors.length > 0) {
+              updated.errors = [...updated.errors, ...chunk.errors]
+            }
           } else if (chunk.type === 'planner') {
             const planSteps = chunk.plan || []
             updated.steps = planSteps.map((step: any, idx: number) => ({
@@ -304,7 +387,7 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
 
           return updated
         })
-      })
+      }, chatSessionId)
     } catch (err: any) {
       setActiveSession((curr) => {
         if (!curr) return null
@@ -315,6 +398,25 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
         }
       })
     }
+  }
+
+  const handleSendPrompt = async (
+    projectId: string,
+    promptText: string,
+    selectedAgentIds: string[]
+  ) => {
+    await runPrompt(projectId, promptText, selectedAgentIds)
+  }
+
+  const handleSendFollowUp = async () => {
+    const promptText = followUpText.trim()
+    if (!promptText || isDeveloping || !activeSession?.projectId) {
+      return
+    }
+    const projectId = activeSession.projectId
+    const agentIds = followUpSelectedAgents.length > 0 ? followUpSelectedAgents : (activeSession.selectedAgentIds || [])
+    setFollowUpText('')
+    await runPrompt(projectId, promptText, agentIds, activeChatId)
   }
 
   const isDeveloping = activeSession 
@@ -344,6 +446,8 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
           projectName={activeSession?.projectName} 
           prompt={activeSession?.prompt} 
           isSessionActive={!!activeSession} 
+          isWorkspaceOpen={isWorkspaceOpen}
+          onToggleWorkspace={() => setIsWorkspaceOpen((open) => !open)}
         />
 
         {activeSession ? (
@@ -488,69 +592,141 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
               </div>
 
               {/* Sticky Chat Input Box at the Bottom of Left Pane */}
-              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-full max-w-2xl px-6 z-10 flex flex-col items-center">
-                <div className="w-full bg-[#171717] border border-[#262626] rounded-xl flex flex-col shadow-2xl">
-                  <input
-                    className="w-full bg-transparent border-none text-primary placeholder-on-surface-variant/40 px-4 py-4 focus:ring-0 focus:border-transparent outline-none text-[16px] leading-tight"
+              <div className="absolute bottom-6 left-0 right-0 z-10 flex justify-center px-5 pointer-events-none">
+                <div className="w-full max-w-[820px] bg-[#171717] border border-[#2c2c2c] rounded-[22px] flex flex-col shadow-2xl overflow-hidden pointer-events-auto">
+                  <textarea
+                    className="block w-full min-h-[82px] max-h-36 bg-transparent border-none text-primary placeholder-on-surface-variant/45 px-5 pt-4 pb-2 focus:ring-0 focus:border-transparent outline-none text-[15px] leading-relaxed resize-none"
                     value={followUpText}
                     onChange={(e) => setFollowUpText(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault()
-                        setFollowUpText('') // Clear locally, do not submit to backend
+                        void handleSendFollowUp()
                       }
                     }}
                     placeholder="Ask for follow-up changes"
-                    type="text"
+                    rows={2}
+                    disabled={isDeveloping}
                   />
-                  <div className="flex justify-between items-center px-4 pb-3">
-                    <div className="flex items-center gap-2">
-                      <button className="p-1.5 text-on-surface-variant hover:text-white rounded hover:bg-[#262626] transition-colors" type="button" aria-label="Add attachment">
+                  <div className="flex flex-wrap items-center justify-between px-4 pb-3 gap-2">
+                    <div className="flex flex-wrap items-center gap-2 min-w-0">
+                      <button className="w-8 h-8 shrink-0 flex items-center justify-center text-on-surface-variant hover:text-white rounded-lg hover:bg-[#262626] transition-colors" type="button" aria-label="Add attachment">
                         <span className="material-symbols-outlined text-[20px]">add</span>
                       </button>
-                      {/* Task 2: Permission select with auto-review and Full Access options */}
-                      <div className="relative">
-                        <select className="flex items-center gap-1.5 text-[12px] text-on-surface-variant hover:text-white px-2.5 py-1 rounded border border-outline-variant/30 hover:bg-[#262626] transition-colors cursor-pointer appearance-none bg-[#171717]">
+                      <div className="relative shrink-0">
+                        <select
+                          className="h-9 text-[12px] text-on-surface-variant hover:text-white pl-3 pr-8 rounded-lg border border-outline-variant/30 hover:bg-[#262626] transition-colors cursor-pointer appearance-none bg-[#171717]"
+                          value={followUpPermission}
+                          onChange={(e) => setFollowUpPermission(e.target.value)}
+                          disabled={isDeveloping}
+                        >
                           <option value="auto-review">Auto-review</option>
                           <option value="full-access">Full Access</option>
+                          <option value="default">Default</option>
                         </select>
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-[16px] text-on-surface-variant">keyboard_arrow_down</span>
+                        <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-[16px] text-on-surface-variant">keyboard_arrow_down</span>
+                      </div>
+                      <div className="h-9 flex items-center gap-1.5 text-[12px] text-on-surface-variant px-3 rounded-lg border border-outline-variant/30 bg-[#171717] min-w-[150px] max-w-[240px]">
+                        <span className="material-symbols-outlined text-[15px]">folder</span>
+                        <span className="truncate">{activeSession.projectName || 'Selected project'}</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      {/* Task 3: Model selector */}
-                      <div className="relative">
-                        <select className="text-[12px] text-on-surface-variant font-code-md bg-[#171717] border border-outline-variant/30 rounded px-2 py-1 cursor-pointer appearance-none hover:text-white hover:border-primary">
-                          <option value="5.5">5.5 <span className="opacity-50">High</span></option>
-                          <option value="4.0">4.0 <span className="opacity-50">Medium</span></option>
-                          <option value="3.5">3.5 <span className="opacity-50">Low</span></option>
+                    <div className="flex flex-wrap items-center justify-end gap-2 min-w-0">
+                      <div className="relative shrink-0">
+                        <select
+                          className="h-9 text-[12px] text-on-surface-variant font-code-md bg-[#171717] border border-outline-variant/30 rounded-lg pl-3 pr-8 cursor-pointer appearance-none hover:text-white hover:border-primary"
+                          value={followUpModel}
+                          onChange={(e) => setFollowUpModel(e.target.value)}
+                          disabled={isDeveloping}
+                        >
+                          <option value="llama-3.3-70b">Llama 3.3</option>
+                          <option value="qwen3-32b">Qwen 3</option>
+                          <option value="default">Default</option>
                         </select>
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-[14px] text-on-surface-variant">keyboard_arrow_down</span>
+                        <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-[14px] text-on-surface-variant">keyboard_arrow_down</span>
                       </div>
-                      {/* Task 3: Agent selector */}
-                      <div className="relative">
-                        <select className="text-[12px] text-on-surface-variant font-code-md bg-[#171717] border border-outline-variant/30 rounded px-2 py-1 cursor-pointer appearance-none hover:text-white hover:border-primary">
-                          <option value="dev-agent">Dev Agent</option>
-                          <option value="review-agent">Review Agent</option>
-                          <option value="qa-agent">QA Agent</option>
-                        </select>
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-[14px] text-on-surface-variant">keyboard_arrow_down</span>
+                      {/* Agent Selector (Multi-select) */}
+                      <div ref={agentDropdownRef} className="relative shrink-0">
+                        <button
+                          className="h-9 flex items-center gap-2 px-3 text-on-surface-variant hover:text-white rounded-lg border border-outline-variant/30 hover:bg-[#262626] transition-colors cursor-pointer text-left bg-[#171717] max-w-[150px]"
+                          type="button"
+                          onClick={() => setIsAgentDropdownOpen(!isAgentDropdownOpen)}
+                          disabled={isDeveloping}
+                        >
+                          <div className="flex -space-x-1.5 pointer-events-none" aria-hidden="true">
+                            {followUpSelectedAgents.map((agentId) => {
+                              const agent = downloadedAgents.find((a) => a.id === agentId)
+                              if (!agent) return null
+                              return (
+                                <div key={agent.id} className="w-4 h-4 rounded bg-surface-container-highest flex items-center justify-center border border-background">
+                                  <span className="material-symbols-outlined text-[10px]">{agent.icon}</span> 
+                                </div>
+                              )
+                            })}
+                          </div>
+                          <span className="font-code-md text-[12px] truncate">
+                            {followUpSelectedAgents.length === 0
+                              ? 'No Agents'
+                              : followUpSelectedAgents.length === 1
+                              ? downloadedAgents.find((a) => a.id === followUpSelectedAgents[0])?.name
+                              : 'Agents'}
+                          </span>
+                          {followUpSelectedAgents.length > 2 && (
+                            <span className="text-[10px] bg-secondary-container/20 text-secondary px-1.5 rounded-full">
+                              +{followUpSelectedAgents.length - 2}
+                            </span>
+                          )}
+                          <span className="material-symbols-outlined text-[14px] shrink-0">keyboard_arrow_down</span>
+                        </button>
+
+                        {isAgentDropdownOpen && (
+                          <div className="absolute right-0 bottom-full mb-2 z-50 min-w-[200px] bg-[#171717] border border-outline-variant/30 rounded-lg p-2 shadow-xl flex flex-col gap-1">
+                            {downloadedAgents.length === 0 ? (
+                              <div className="px-3 py-2 text-[12px] text-on-surface-variant">
+                                Download agents from Marketplace first.
+                              </div>
+                            ) : downloadedAgents.map((agent) => {
+                              const isSelected = followUpSelectedAgents.includes(agent.id)
+                              return (
+                                <div
+                                  key={agent.id}
+                                  className="flex items-center gap-2 px-3 py-2 hover:bg-[#262626] rounded-md cursor-pointer text-on-surface select-none text-[12px]"
+                                  onClick={() => {
+                                    if (isSelected) {
+                                      setFollowUpSelectedAgents(followUpSelectedAgents.filter((id) => id !== agent.id))
+                                    } else {
+                                      setFollowUpSelectedAgents([...followUpSelectedAgents, agent.id])
+                                    }
+                                  }}
+                                >
+                                  <span className="material-symbols-outlined text-[18px] text-primary">
+                                    {isSelected ? 'check_box' : 'check_box_outline_blank'}
+                                  </span>
+                                  <span className="material-symbols-outlined text-[16px]">{agent.icon}</span>
+                                  <span className="font-body-sm">{agent.name}</span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
                       </div>
-                      {/* Task 4: Submit button with ripple effect */}
                       <button
                         onClick={(e) => {
                           createRipple(e)
-                          setFollowUpText('')
+                          void handleSendFollowUp()
                         }}
-                        className={`w-8 h-8 rounded flex items-center justify-center transition-all ${
+                        className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all shrink-0 overflow-hidden ${
                           followUpText.trim()
                             ? 'bg-primary text-on-primary hover:bg-opacity-90 active:scale-95 cursor-pointer'
                             : 'bg-[#353534] text-on-surface-variant opacity-50 cursor-not-allowed'
                         }`}
                         type="button"
                         aria-label="Submit follow-up"
+                        disabled={!followUpText.trim() || isDeveloping}
                       >
-                        <span className="material-symbols-outlined text-[20px]">arrow_upward</span>
+                        <span className="material-symbols-outlined text-[20px]">
+                          {isDeveloping ? 'progress_activity' : 'arrow_upward'}
+                        </span>
                       </button>
                     </div>
                   </div>
@@ -559,13 +735,26 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
             </div>
 
             {/* Right Workspace File Explorer & Code Editor Panel */}
-            {activeSession.workspacePath && activeSession.projectId && (
+            {activeSession.projectId && isWorkspaceOpen && (
               <div className="w-[55%] h-full shrink-0 animate-step-fade-in z-20">
                 <WorkspacePanel
                   projectId={activeSession.projectId}
                   projectName={activeSession.projectName}
+                  onClose={() => setIsWorkspaceOpen(false)}
                 />
               </div>
+            )}
+
+            {activeSession.projectId && !isWorkspaceOpen && (
+              <button
+                type="button"
+                onClick={() => setIsWorkspaceOpen(true)}
+                className="absolute right-4 top-20 z-30 flex items-center gap-2 bg-[#171717] border border-[#262626] text-on-surface-variant hover:text-white rounded-lg px-3 py-2 shadow-xl transition-colors"
+                aria-label="Show workspace explorer"
+              >
+                <span className="material-symbols-outlined text-[18px]">view_sidebar</span>
+                <span className="text-[12px] font-code-md">Files</span>
+              </button>
             )}
 
           </div>

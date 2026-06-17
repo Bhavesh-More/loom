@@ -1,5 +1,5 @@
 import { type ChangeEvent, useEffect, useRef, useState } from 'react'
-import { getProjects, developProject } from '../lib/projects'
+import { getProjects, developProject, type Project } from '../lib/projects'
 import { getDownloadedAgents, type AgentData } from '../lib/agents'
 
 type PromptComposerProps = {
@@ -12,6 +12,7 @@ function PromptComposer({ onSendPrompt, isDevelopingProps }: PromptComposerProps
   const agentDropdownRef = useRef<HTMLDivElement>(null)
   const [prompt, setPrompt] = useState('')
   const [selectedProjectId, setSelectedProjectId] = useState('')
+  const [newProjectName, setNewProjectName] = useState('')
   const [isDevelopingState, setIsDevelopingState] = useState(false)
   const isDeveloping = isDevelopingProps !== undefined ? isDevelopingProps : isDevelopingState
   const [developError, setDevelopError] = useState('')
@@ -20,6 +21,7 @@ function PromptComposer({ onSendPrompt, isDevelopingProps }: PromptComposerProps
   // Custom states for permission, model, agents, and ripple effect
   const [permission, setPermission] = useState('default')
   const [selectedModel, setSelectedModel] = useState('gemini-1.5-pro')
+  const [projects, setProjects] = useState<Project[]>([])
   const [downloadedAgents, setDownloadedAgents] = useState<AgentData[]>([])
   const [selectedAgents, setSelectedAgents] = useState<string[]>([])
   const [isAgentDropdownOpen, setIsAgentDropdownOpen] = useState(false)
@@ -40,14 +42,53 @@ function PromptComposer({ onSendPrompt, isDevelopingProps }: PromptComposerProps
       return
     }
 
+    if (selectedProjectId === 'new-project' && !newProjectName.trim()) {
+      setDevelopError('Please enter a project name for the new project.')
+      return
+    }
+
     // Trigger Siri-like ripple effect for 2.5 seconds
     setIsRippling(true)
     setTimeout(() => {
       setIsRippling(false)
     }, 2500)
 
+    let projectIdToDevelop = selectedProjectId
+
+    if (selectedProjectId === 'new-project') {
+      setIsDevelopingState(true)
+      setDevelopError('')
+      setDevelopSuccess('')
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'}/projects`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: newProjectName.trim(),
+            description: `Created for: ${prompt.trim().substring(0, 100)}`,
+            agent_ids: selectedAgents,
+          }),
+        })
+        if (!response.ok) {
+          const errText = await response.text()
+          throw new Error(errText || 'Failed to create new project')
+        }
+        const newProj = await response.json()
+        projectIdToDevelop = newProj.project_id
+        // Dispatch event to notify Sidebar and other components
+        window.dispatchEvent(new CustomEvent('project-created'))
+        setNewProjectName('')
+      } catch (err: any) {
+        setDevelopError(err.message || 'Failed to create new project')
+        setIsDevelopingState(false)
+        return
+      }
+    }
+
     if (onSendPrompt) {
-      void onSendPrompt(selectedProjectId, prompt.trim(), selectedAgents)
+      void onSendPrompt(projectIdToDevelop, prompt.trim(), selectedAgents)
       setPrompt('')
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto'
@@ -60,7 +101,7 @@ function PromptComposer({ onSendPrompt, isDevelopingProps }: PromptComposerProps
     setDevelopSuccess('')
 
     try {
-      const result = await developProject(selectedProjectId, prompt.trim(), selectedAgents)
+      const result = await developProject(projectIdToDevelop, prompt.trim(), selectedAgents)
       let successMsg = `Successfully developed project! Files written to: ${result.workspace_path}`
       if (result.errors && result.errors.length > 0) {
         successMsg += ` (with errors: ${result.errors.join(', ')})`
@@ -97,13 +138,17 @@ function PromptComposer({ onSendPrompt, isDevelopingProps }: PromptComposerProps
           return
         }
 
+        setProjects(projectData)
         setDownloadedAgents(downloadedAgentData)
         setSelectedProjectId((currentProjectId) => {
+          if (currentProjectId === 'new-project') {
+            return 'new-project'
+          }
           if (projectData.some((project) => project.id === currentProjectId)) {
             return currentProjectId
           }
 
-          return projectData[0]?.id ?? ''
+          return 'new-project'
         })
         setSelectedAgents((currentSelectedAgents) => {
           const availableAgentIds = new Set(downloadedAgentData.map((agent) => agent.id))
@@ -211,6 +256,20 @@ function PromptComposer({ onSendPrompt, isDevelopingProps }: PromptComposerProps
         {isRippling && <div className="siri-ripple-container" />}
         
         <div className={`bg-surface-container-low border border-outline-variant rounded-[24px] flex flex-col shadow-2xl relative z-10 transition-colors duration-300 ${isRippling ? 'siri-active' : ''}`}>
+          {/* Project Name Input */}
+          {selectedProjectId === 'new-project' && (
+            <div className="px-6 pt-5 pb-2 border-b border-outline-variant/30 flex items-center gap-2">
+              <span className="material-symbols-outlined text-[18px] text-on-surface-variant">create_new_folder</span>
+              <input
+                type="text"
+                className="w-full bg-transparent border-none outline-none focus:ring-0 text-primary placeholder:text-outline/40 text-[14px] font-medium p-0"
+                placeholder="Enter new project name (e.g., Task Manager)"
+                value={newProjectName}
+                onChange={(e) => setNewProjectName(e.target.value)}
+                disabled={isDeveloping}
+              />
+            </div>
+          )}
           {/* Text Area */}
           <div className="p-6">
             <textarea
@@ -232,6 +291,28 @@ function PromptComposer({ onSendPrompt, isDevelopingProps }: PromptComposerProps
               <button className="p-2 text-on-surface-variant hover:text-white rounded-full hover:bg-surface-variant/30 transition-colors" type="button" aria-label="Add attachment" disabled={isDeveloping}>
                 <span className="material-symbols-outlined text-[20px]">add</span>
               </button>
+
+              {/* Permission Selector */}
+              <div className="flex items-center gap-1.5 px-3 py-1 text-on-surface-variant hover:text-white rounded-full border border-outline-variant/30 hover:bg-surface-variant/30 transition-colors relative cursor-pointer max-w-[220px]">
+                <span className="material-symbols-outlined text-[16px] pointer-events-none">folder</span>
+                <select
+                  aria-label="Select project"
+                  className="bg-transparent border-none outline-none focus:ring-0 focus:border-transparent focus:outline-none text-inherit font-inherit font-label-caps text-[11px] py-0 pl-0 pr-5 cursor-pointer select-none appearance-none min-w-0 truncate"
+                  value={selectedProjectId}
+                  onChange={(event) => setSelectedProjectId(event.target.value)}
+                  disabled={isDeveloping}
+                >
+                  <option value="new-project" className="bg-surface text-on-surface font-semibold text-secondary">
+                    + Create New Project
+                  </option>
+                  {projects.map((project) => (
+                    <option key={project.id} value={project.id} className="bg-surface text-on-surface">
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+                <span className="material-symbols-outlined text-[16px] absolute right-2 pointer-events-none">keyboard_arrow_down</span>
+              </div>
 
               {/* Permission Selector */}
               <div className="flex items-center gap-1.5 px-3 py-1 text-on-surface-variant hover:text-white rounded-full border border-outline-variant/30 hover:bg-surface-variant/30 transition-colors relative cursor-pointer">

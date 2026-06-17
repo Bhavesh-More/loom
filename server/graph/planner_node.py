@@ -2,6 +2,7 @@ import json
 import os
 from langchain_groq import ChatGroq
 from graph.state import LoomState
+from observability.execution_logger import log_execution_event
 from prompts.prompts import PLANNER_SYSTEM_PROMPT
 
 TIER_MAP = {
@@ -71,6 +72,15 @@ Produce the execution plan now.
         {"role": "system", "content": PLANNER_SYSTEM_PROMPT},
         {"role": "user",   "content": "/think\n" + user_message},
     ]
+    log_execution_event(
+        "planner.input",
+        {
+            "project_id": state.get("project_id"),
+            "chat_session_id": state.get("chat_session_id"),
+            "agents": agents_to_plan,
+            "messages": messages,
+        },
+    )
 
     response = llm.invoke(messages)
     raw = response.content
@@ -102,4 +112,14 @@ Produce the execution plan now.
 
     state["execution_plan"] = plan
     state["current_step"]   = 0
+    log_execution_event(
+        "planner.output",
+        {
+            "project_id": state.get("project_id"),
+            "chat_session_id": state.get("chat_session_id"),
+            "plan_json": plan,
+            "raw_output": raw,
+            "errors": state.get("errors", []),
+        },
+    )
     return state

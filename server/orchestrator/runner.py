@@ -42,6 +42,7 @@ def run_project(
         "errors":          [],
         "context_payload": {},
         "context_payload_text": "",
+        "chat_session_id": "",
     }
 
     print(f"\n{'='*60}")

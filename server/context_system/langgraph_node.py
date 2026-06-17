@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 
 from context_system.service import context_system
+from observability.execution_logger import log_execution_event
 
 
 class ContextUnderstandingNode:
@@ -18,6 +19,18 @@ class ContextUnderstandingNode:
             payload = await context_system.analyze(repo_path, prompt, task_id)
             state["context_payload"] = payload.model_dump(by_alias=True)
             state["context_payload_text"] = context_system.payload_to_prose(payload)
+            log_execution_event(
+                "context.payload",
+                {
+                    "project_id": state.get("project_id"),
+                    "chat_session_id": state.get("chat_session_id"),
+                    "repo_path": repo_path,
+                    "task_id": task_id,
+                    "prompt": prompt,
+                    "context_json": state["context_payload"],
+                    "context_text": state["context_payload_text"],
+                },
+            )
         except Exception as exc:
             state["context_payload"] = {
                 "task": prompt,
@@ -36,6 +49,17 @@ class ContextUnderstandingNode:
                 "Proceed using the project goal and prior agent context."
             )
             state["errors"].append(f"Context understanding failed: {exc}")
+            log_execution_event(
+                "context.error",
+                {
+                    "project_id": state.get("project_id"),
+                    "chat_session_id": state.get("chat_session_id"),
+                    "repo_path": repo_path,
+                    "task_id": task_id,
+                    "prompt": prompt,
+                    "error": str(exc),
+                },
+            )
         return state
 
 

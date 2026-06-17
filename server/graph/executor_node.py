@@ -1,6 +1,7 @@
 import os
 from langchain_groq import ChatGroq
 from graph.state import LoomState
+from observability.execution_logger import log_execution_event
 from prompts.prompts import AGENT_PROMPT_MAP
 
 
@@ -74,17 +75,52 @@ Generate the code now.
         {"role": "system", "content": system_prompt},
         {"role": "user",   "content": user_message},
     ]
+    log_execution_event(
+        "agent.input",
+        {
+            "project_id": state.get("project_id"),
+            "chat_session_id": state.get("chat_session_id"),
+            "agent": agent_name,
+            "step_index": step_index,
+            "task": task,
+            "context_keys": context_keys,
+            "messages": messages,
+        },
+    )
 
     try:
         response = llm.invoke(messages)
         output = response.content
         state["agent_outputs"][agent_name] = output
         print(f"[Executor] Agent '{agent_name}' completed. Output length: {len(output)} chars")
+        log_execution_event(
+            "agent.output",
+            {
+                "project_id": state.get("project_id"),
+                "chat_session_id": state.get("chat_session_id"),
+                "agent": agent_name,
+                "step_index": step_index,
+                "task": task,
+                "raw_output": output,
+                "errors": state.get("errors", []),
+            },
+        )
     except Exception as e:
         error_msg = f"Agent '{agent_name}' failed: {str(e)}"
         print(f"[Executor] ERROR: {error_msg}")
         state["errors"].append(error_msg)
         state["agent_outputs"][agent_name] = ""
+        log_execution_event(
+            "agent.error",
+            {
+                "project_id": state.get("project_id"),
+                "chat_session_id": state.get("chat_session_id"),
+                "agent": agent_name,
+                "step_index": step_index,
+                "task": task,
+                "error": str(e),
+            },
+        )
 
     state["current_step"] = step_index + 1
     return state

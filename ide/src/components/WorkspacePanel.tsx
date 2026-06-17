@@ -12,9 +12,10 @@ import CodeEditor from './CodeEditor'
 type WorkspacePanelProps = {
   projectId: string
   projectName?: string
+  onClose?: () => void
 }
 
-export default function WorkspacePanel({ projectId, projectName = 'Project' }: WorkspacePanelProps) {
+export default function WorkspacePanel({ projectId, projectName = 'Project', onClose }: WorkspacePanelProps) {
   const [tree, setTree] = useState<FileTreeNode[]>([])
   const [activeFilePath, setActiveFilePath] = useState<string | null>(null)
   const [fileContent, setFileContent] = useState<string | null>(null)
@@ -115,6 +116,17 @@ export default function WorkspacePanel({ projectId, projectName = 'Project' }: W
             <span className="material-symbols-outlined text-[16px]">download</span>
             <span>Download ZIP</span>
           </a>
+
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="p-1.5 text-on-surface-variant hover:text-white rounded hover:bg-[#262626] transition-colors ml-1 flex items-center justify-center"
+              title="Close Workspace Explorer"
+              type="button"
+            >
+              <span className="material-symbols-outlined text-[18px]">close</span>
+            </button>
+          )}
         </div>
       </div>
 
