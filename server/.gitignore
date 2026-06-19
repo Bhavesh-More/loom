@@ -7,3 +7,5 @@ __pycache__/
 
 outputs/
 logs/
+
+.pytest_cache
