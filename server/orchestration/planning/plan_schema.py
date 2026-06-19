@@ -4,6 +4,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictFloat, StrictInt, StrictStr
 
+from orchestration.planning.task_graph import TaskGraph
+
 
 FieldType = Literal["str", "int", "float", "bool", "list", "dict", "any"]
 PipelineStatus = Literal[
@@ -64,6 +66,7 @@ class ExecutionPlan(BaseModel):
     agents: list[AgentSpec]
     failure_policy: FailurePolicy = Field(default_factory=FailurePolicy)
     status: PipelineStatus = "pending"
+    task_graph: TaskGraph | None = Field(default=None, description="The hierarchical task graph for orchestration")
 
     def agent_map(self) -> dict[str, AgentSpec]:
         return {agent.id: agent for agent in self.agents}

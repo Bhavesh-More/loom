@@ -10,3 +10,7 @@ from orchestration.planning.agent_router import (
     RoutingDecision,
     route_task,
 )
+from orchestration.planning.task_graph import (
+    TaskGraph,
+    TaskNode,
+)
