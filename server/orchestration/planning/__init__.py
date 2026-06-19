@@ -6,3 +6,7 @@ from orchestration.planning.agent_registry import (
     get_agent_profile,
     list_agent_profiles,
 )
+from orchestration.planning.agent_router import (
+    RoutingDecision,
+    route_task,
+)
