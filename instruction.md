@@ -38,7 +38,7 @@ rg --version
 Install backend Python dependencies:
 
 ```bash
-cd /Users/bhaveshmore/Documents/Hackathon/loom/server
+cd <path>/loom/server
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -74,7 +74,7 @@ export REDIS_URL=redis://localhost:6379/0
 `REDIS_URL` enables Redis checkpointing for the Confidence Scoring & Validation Workflow. If it is not set, Loom uses an in-memory fallback.
 
 ```bash
-cd /Users/bhaveshmore/Documents/Hackathon/loom/server
+cd <path>/loom/server
 ./.venv/bin/uvicorn main:app --reload
 ```
 
@@ -91,7 +91,7 @@ That migration enables `pgvector` and creates `symbol_index`, `import_graph_edge
 ## 2. Frontend Setup
 
 ```bash
-cd /Users/bhaveshmore/Documents/Hackathon/loom/ide
+cd <path>/loom/ide
 npm install
 npm run dev
 ```
@@ -162,7 +162,7 @@ From Swagger, call `POST /context/analyze` with:
 
 ```json
 {
-  "repo_path": "/Users/bhaveshmore/Documents/Hackathon/loom/ide",
+  "repo_path": "<path>loom/ide",
   "prompt": "add a dark mode toggle in the top app bar and persist the selected theme",
   "task_id": "context-smoke-1",
   "token_budget": 4096
@@ -221,7 +221,7 @@ If `LOOM_CONTEXT_LOGS` is not set, Loom will skip the file logger and keep runni
 From the backend directory:
 
 ```bash
-cd /Users/bhaveshmore/Documents/Hackathon/loom/server
+cd <path>/loom/server
 ./.venv/bin/pytest orchestration/tests -q
 ```
 
@@ -250,4 +250,4 @@ export REDIS_URL=redis://localhost:6379/0
 
 See also:
 
-- [REDIS_SETUP.md](/Users/bhaveshmore/Documents/Hackathon/loom/REDIS_SETUP.md)
+- [REDIS_SETUP.md](loom/REDIS_SETUP.md)
