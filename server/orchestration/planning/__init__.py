@@ -14,3 +14,6 @@ from orchestration.planning.task_graph import (
     TaskGraph,
     TaskNode,
 )
+from orchestration.planning.decomposition_engine import (
+    DecompositionEngine,
+)

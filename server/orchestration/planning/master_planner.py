@@ -18,6 +18,7 @@ from orchestration.planning.plan_schema import (
     FailurePolicy,
 )
 from orchestration.planning.plan_validator import PlanValidator
+from orchestration.planning.decomposition_engine import DecompositionEngine
 
 
 SUPPORTED_AGENT_IDS = set(AGENT_PROMPT_MAP)
@@ -46,6 +47,7 @@ class MasterPlanner:
     def __init__(self, llm: Any | None = None) -> None:
         self.llm = llm
         self.validator = PlanValidator()
+        self.decomposition_engine = DecompositionEngine(llm=llm)
 
     async def build_plan(self, task: str, context: dict[str, Any]) -> ExecutionPlan:
         run_id = str(context.get("run_id") or uuid.uuid4())
@@ -56,6 +58,21 @@ class MasterPlanner:
         validation = await self.validator.validate(plan)
         if not validation.passed:
             raise ValueError("Invalid execution plan: " + "; ".join(validation.errors))
+
+        # Build hierarchical task graph via decomposition engine and attach to plan
+        try:
+            task_graph = await self.decomposition_engine.decompose(task, context)
+            plan = plan.model_copy(update={"task_graph": task_graph})
+            log_execution_event(
+                "orchestration.plan.task_graph_built",
+                {"run_id": run_id, "node_count": len(task_graph.nodes)},
+            )
+        except Exception as exc:
+            log_execution_event(
+                "orchestration.plan.task_graph_skipped",
+                {"run_id": run_id, "error": str(exc)},
+            )
+
         await self._persist_plan(plan)
         return plan
 
