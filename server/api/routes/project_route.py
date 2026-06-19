@@ -170,6 +170,8 @@ async def develop_project(request: DevelopProjectRequest):
                 "context_payload": {},
                 "context_payload_text": "",
                 "chat_session_id": str(chat_session_id),
+                "task_graph": None,
+                "task_graph_logs": [],
             }
 
             yield json.dumps({
@@ -211,6 +213,8 @@ async def develop_project(request: DevelopProjectRequest):
                     }) + "\n"
                 elif node_name == "planner":
                     plan = state_update.get("execution_plan", [])
+                    task_graph = state_update.get("task_graph")
+                    task_graph_logs = state_update.get("task_graph_logs", [])
                     messages_to_insert.append({
                         "session_id": chat_session_id,
                         "role": "system",
@@ -218,6 +222,8 @@ async def develop_project(request: DevelopProjectRequest):
                         "content": {
                             "text": f"Generated plan with {len(plan)} steps.",
                             "plan": plan,
+                            "task_graph": task_graph,
+                            "task_graph_logs": task_graph_logs,
                             "errors": errors
                         }
                     })
@@ -225,6 +231,8 @@ async def develop_project(request: DevelopProjectRequest):
                         "type": "planner",
                         "message": f"Generated plan with {len(plan)} steps.",
                         "plan": plan,
+                        "task_graph": task_graph,
+                        "task_graph_logs": task_graph_logs,
                         "errors": errors
                     }) + "\n"
                 elif node_name == "executor":

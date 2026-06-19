@@ -24,6 +24,22 @@ class RetryRequest(BaseModel):
     fix_description: str
 
 
+class TaskNodeResponse(BaseModel):
+    id: str
+    parent_id: str | None = None
+    agent_id: str
+    task: str
+    capabilities_required: list[str]
+    capability_score: float
+    selection_reasoning: str
+    depends_on: list[str]
+
+
+class TaskGraphResponse(BaseModel):
+    nodes: list[TaskNodeResponse]
+    selection_logs: list[str]
+
+
 @router.post("/run", response_model=PipelineResult)
 async def run_orchestration(request: RunRequest) -> PipelineResult:
     orchestrator = PipelineOrchestrator()
@@ -47,6 +63,35 @@ async def get_orchestration_status(run_id: str) -> dict[str, Any]:
         return dict(row)
     finally:
         await database.release_conn(conn)
+
+
+@router.get("/plan/{run_id}/task-graph", response_model=TaskGraphResponse)
+async def get_task_graph(run_id: str) -> TaskGraphResponse:
+    """Return the hierarchical task graph and per-node agent selection reasoning for a pipeline run."""
+    plan = await _load_plan(run_id)
+    if plan.task_graph is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No task graph available for this run. The decomposition engine may not have run.",
+        )
+    nodes = [
+        TaskNodeResponse(
+            id=node.id,
+            parent_id=node.parent_id,
+            agent_id=node.agent_id,
+            task=node.task,
+            capabilities_required=node.capabilities_required,
+            capability_score=node.capability_score,
+            selection_reasoning=node.selection_reasoning,
+            depends_on=node.depends_on,
+        )
+        for node in plan.task_graph.nodes
+    ]
+    selection_logs = [
+        f"[{node.id}] agent={node.agent_id} score={node.capability_score:.2f} | {node.selection_reasoning}"
+        for node in plan.task_graph.nodes
+    ]
+    return TaskGraphResponse(nodes=nodes, selection_logs=selection_logs)
 
 
 @router.get("/agent/{run_id}/{agent_id}/output")

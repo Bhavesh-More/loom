@@ -1,8 +1,12 @@
+import asyncio
 import json
 import os
+
 from langchain_groq import ChatGroq
+
 from graph.state import LoomState
 from observability.execution_logger import log_execution_event
+from orchestration.planning.decomposition_engine import DecompositionEngine
 from prompts.prompts import PLANNER_SYSTEM_PROMPT
 
 TIER_MAP = {
@@ -30,6 +34,10 @@ def planner_node(state: LoomState) -> LoomState:
     Plans ONLY for state['active_agents'] — the subset the router decided is needed
     for this specific query. This prevents running mongodb/fastapi when the user
     only asked to generate the frontend.
+
+    After the LLM plan is built, the DecompositionEngine runs to produce a
+    hierarchical TaskGraph which is stored in state['task_graph'] along with
+    per-node agent selection reasoning in state['task_graph_logs'].
     """
     print("\n[Planner] Generating execution plan...")
 
@@ -112,6 +120,49 @@ Produce the execution plan now.
 
     state["execution_plan"] = plan
     state["current_step"]   = 0
+
+    # --- Task Graph Decomposition ---
+    # Run the DecompositionEngine to build a structured TaskGraph, then store
+    # it and per-node agent selection reasoning logs into state.
+    try:
+        engine = DecompositionEngine()
+        context = {
+            "project_id": state.get("project_id"),
+            "available_agents": agents_to_plan,
+            "selected_agents": state.get("selected_agents", []),
+        }
+        task_graph = asyncio.get_event_loop().run_until_complete(
+            engine.decompose(state["goal"], context)
+        )
+        task_graph_logs = [
+            f"[{node.id}] agent={node.agent_id} score={node.capability_score:.2f} | {node.selection_reasoning}"
+            for node in task_graph.nodes
+        ]
+        state["task_graph"] = task_graph.model_dump()
+        state["task_graph_logs"] = task_graph_logs
+        log_execution_event(
+            "planner.task_graph_built",
+            {
+                "project_id": state.get("project_id"),
+                "chat_session_id": state.get("chat_session_id"),
+                "node_count": len(task_graph.nodes),
+                "logs": task_graph_logs,
+            },
+        )
+        print(f"[Planner] Task graph built with {len(task_graph.nodes)} nodes.")
+    except Exception as exc:
+        state["task_graph"] = None
+        state["task_graph_logs"] = []
+        log_execution_event(
+            "planner.task_graph_skipped",
+            {
+                "project_id": state.get("project_id"),
+                "chat_session_id": state.get("chat_session_id"),
+                "error": str(exc),
+            },
+        )
+        print(f"[Planner] Task graph skipped: {exc}")
+
     log_execution_event(
         "planner.output",
         {

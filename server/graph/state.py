@@ -29,3 +29,8 @@ class LoomState(TypedDict):
     context_payload: dict
     context_payload_text: str
     chat_session_id: str
+
+    # Populated by the planner node when decomposition succeeds.
+    # Stores the serialized TaskGraph dict and per-node agent selection logs.
+    task_graph: Optional[dict]
+    task_graph_logs: Optional[list[str]]
