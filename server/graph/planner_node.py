@@ -28,7 +28,7 @@ TIER_MAP = {
 }
 
 
-def planner_node(state: LoomState) -> LoomState:
+async def planner_node(state: LoomState) -> LoomState:
     """
     Calls Qwen3-32b (thinking enabled) to produce an ordered execution plan.
     Plans ONLY for state['active_agents'] — the subset the router decided is needed
@@ -90,7 +90,7 @@ Produce the execution plan now.
         },
     )
 
-    response = llm.invoke(messages)
+    response = await llm.ainvoke(messages)
     raw = response.content
 
     # Strip <think>...</think> block if present (Qwen3 thinking mode)
@@ -131,9 +131,7 @@ Produce the execution plan now.
             "available_agents": agents_to_plan,
             "selected_agents": state.get("selected_agents", []),
         }
-        task_graph = asyncio.get_event_loop().run_until_complete(
-            engine.decompose(state["goal"], context)
-        )
+        task_graph = await engine.decompose(state["goal"], context)
         task_graph_logs = [
             f"[{node.id}] agent={node.agent_id} score={node.capability_score:.2f} | {node.selection_reasoning}"
             for node in task_graph.nodes

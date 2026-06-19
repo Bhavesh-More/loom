@@ -290,3 +290,68 @@ async def test_master_planner_attaches_task_graph() -> None:
     assert node_ids == {"calc_logic", "db_schema"}
     # decompose must have been called once
     planner.decomposition_engine.decompose.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# 8. planner_node state updates & execution
+# ---------------------------------------------------------------------------
+
+@pytest.mark.anyio
+async def test_planner_node_execution_populates_task_graph_in_state() -> None:
+    """Verify that the async planner_node executes and populates task_graph / task_graph_logs."""
+    from graph.planner_node import planner_node
+    from graph.state import LoomState
+
+    # Mock the LLM to return a simple mock plan
+    mock_llm_response = MagicMock()
+    mock_llm_response.content = '{"plan": [{"step": 1, "agent": "postgresql", "task": "setup table"}]}'
+    
+    mock_llm = MagicMock()
+    mock_llm.ainvoke = AsyncMock(return_value=mock_llm_response)
+
+    # Mock DecompositionEngine to return a mock TaskGraph
+    from orchestration.planning.task_graph import TaskGraph
+    fake_graph = TaskGraph(
+        nodes=[
+            _make_node("db_node", "postgresql", ["sql"])
+        ]
+    )
+
+    # Initialize a mock LoomState
+    state = LoomState(
+        project_id="test-proj",
+        project_name="test-name",
+        goal="Setup database schema",
+        selected_agents=["postgresql"],
+        active_agents=["postgresql"],
+        query_type="codegen",
+        qa_response="",
+        execution_plan=[],
+        current_step=0,
+        agent_outputs={},
+        workspace_path="dummy-path",
+        errors=[],
+        context_payload={},
+        context_payload_text="",
+        chat_session_id="session-123",
+        task_graph=None,
+        task_graph_logs=[]
+    )
+
+    # Use patch to mock ChatGroq instantiation and DecompositionEngine
+    with patch("graph.planner_node.ChatGroq", return_value=mock_llm), \
+         patch("graph.planner_node.DecompositionEngine") as mock_engine_cls:
+        
+        mock_engine = MagicMock()
+        mock_engine.decompose = AsyncMock(return_value=fake_graph)
+        mock_engine_cls.return_value = mock_engine
+
+        # Invoke the async planner_node
+        updated_state = await planner_node(state)
+
+        # Assertions
+        assert updated_state["task_graph"] is not None
+        assert len(updated_state["task_graph_logs"]) == 1
+        assert "[db_node] agent=postgresql" in updated_state["task_graph_logs"][0]
+        assert updated_state["execution_plan"] == [{"step": 1, "agent": "postgresql", "task": "setup table"}]
+
