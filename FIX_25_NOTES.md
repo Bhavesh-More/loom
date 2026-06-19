@@ -63,7 +63,7 @@ We have implemented a central orchestration layer responsible for decomposing hi
 * **Files:** [server/graph/state.py](server/graph/state.py), [server/graph/planner_node.py](server/graph/planner_node.py)
 * **Description:** Exposed the generated task graph to downstream workflows:
   * Added `task_graph` (dict) and `task_graph_logs` (list of formatted selection lines) to `LoomState`.
-  * Updated `planner_node` to execute the decomposition engine, populate the state fields, and log events.
+  * **Event Loop & Thread-Pool Fix:** Refactored `planner_node` into an asynchronous (`async def`) function and replaced blocking/thread-unsafe synchronous LLM and decomposition engine invocations with `await`. This resolves the thread pool event loop collision under FastAPI/Uvicorn, ensuring `task_graph` and `task_graph_logs` are consistently populated in production.
 
 ### Step 7: API & SSE Exposition
 * **Files:** [server/api/routes/orchestration_route.py](server/api/routes/orchestration_route.py), [server/api/routes/project_route.py](server/api/routes/project_route.py)
@@ -74,7 +74,7 @@ We have implemented a central orchestration layer responsible for decomposing hi
 
 ### Step 8: Comprehensive Testing & Isolation
 * **Files:** [server/orchestration/tests/test_integration.py](server/orchestration/tests/test_integration.py), [server/orchestration/tests/conftest.py](server/orchestration/tests/conftest.py)
-* **Description:** Created 9 new integration tests covering end-to-end task flows, parallel groups, and capability routing. 
+* **Description:** Created 10 integration tests covering end-to-end task flows, parallel groups, capability routing, and async `planner_node` state machine execution.
 * **Event Loop Closed Fix:** Added an autouse fixture in `conftest.py` that clears `GROQ_API_KEY_1` for the test suite, preventing lingering background `httpx` connection pools from throwing closed event loop exceptions.
 
 ---
@@ -82,7 +82,7 @@ We have implemented a central orchestration layer responsible for decomposing hi
 ## 2. How to Test All the Things
 
 ### Option A: Automated Tests (Recommended)
-You can run the entire test suite (comprising 35 tests, including registry, routing, contracts, planning, decomposition, and integration tests) using Pytest.
+You can run the entire test suite (comprising 36 tests, including registry, routing, contracts, planning, decomposition, and integration tests) using Pytest.
 
 1. Open a terminal in the `server` directory:
    ```powershell
@@ -95,7 +95,7 @@ You can run the entire test suite (comprising 35 tests, including registry, rout
 
 **Expected Output:**
 ```
-============================= 35 passed in 5.21s ==============================
+============================= 36 passed in 5.35s ==============================
 ```
 
 ### Option B: Manual API Verification
