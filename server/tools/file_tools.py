@@ -144,7 +144,7 @@ def write_agent_files(
             f.write(content)
 
         written_paths.append(full_path)
-        print(f"  [FileWriter] {agent_name} → {os.path.relpath(full_path, workspace_path)}")
+        print(f"  [FileWriter] {agent_name} -> {os.path.relpath(full_path, workspace_path)}")
 
     return written_paths
 
@@ -161,7 +161,7 @@ def write_all_outputs(
 
     for agent_name, raw_output in agent_outputs.items():
         mapping = AGENT_FOLDER_MAP.get(agent_name, _DEFAULT_FOLDER)
-        print(f"\n[FileWriter] {agent_name} → {mapping['base']}/{mapping['subdir']}/")
+        print(f"\n[FileWriter] {agent_name} -> {mapping['base']}/{mapping['subdir']}/")
         written          = write_agent_files(agent_name, raw_output, workspace_path)
         results[agent_name] = written
 

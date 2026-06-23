@@ -31,6 +31,7 @@ type ChatSession = {
   errors: string[]
   selectedAgentIds: string[]
   contextFiles: string[]
+  qaResponse?: string
 }
 
 
@@ -119,6 +120,10 @@ function reconstructSessionFromMessages(sessionData: any, messages: ChatMessage[
     status = 'failed'
   }
 
+  // 6.5. Get QA response from messages if it exists
+  const qaMsg = messages.find(m => m.role === 'assistant' && m.message_type === 'text')
+  const qaResponse = qaMsg?.content?.text || ''
+
   // 7. Calculate elapsed time if possible
   let elapsedTime = 0
   if (messages.length > 1) {
@@ -138,6 +143,7 @@ function reconstructSessionFromMessages(sessionData: any, messages: ChatMessage[
     errors,
     selectedAgentIds: [],
     contextFiles: [],
+    qaResponse,
   }
 }
 
@@ -267,6 +273,23 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
     }
   }
 
+  const handleSelectProject = (projectId: string, projectName: string) => {
+    setActiveChatId(null)
+    setActiveSession({
+      projectId: projectId,
+      prompt: '',
+      projectName: projectName,
+      status: 'idle',
+      steps: [],
+      elapsedTime: 0,
+      workspacePath: '',
+      errors: [],
+      selectedAgentIds: [],
+      contextFiles: [],
+    })
+    setIsWorkspaceOpen(true)
+  }
+
   // Start incrementing timer when session is running
   useEffect(() => {
     if (activeSession && (activeSession.status === 'planning' || activeSession.status === 'running')) {
@@ -377,6 +400,8 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
             if (chunk.errors && chunk.errors.length > 0) {
               updated.errors = [...updated.errors, ...chunk.errors]
             }
+          } else if (chunk.type === 'qa') {
+            updated.qaResponse = chunk.message || ''
           } else if (chunk.type === 'complete') {
             updated.steps = updated.steps.map(s => s.status === 'running' || s.status === 'pending' ? { ...s, status: 'completed' } : s)
             updated.status = 'completed'
@@ -437,6 +462,7 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
         }} 
         activeChatId={activeChatId}
         onSelectChat={handleSelectChat}
+        onSelectProject={handleSelectProject}
       />
 
       {/* Main Content Pane */}
@@ -497,6 +523,12 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
                         {activeSession.status === 'completed' && `Successfully completed project ${activeSession.projectName}!`}
                         {activeSession.status === 'failed' && 'Development execution halted due to errors.'}
                       </p>
+
+                      {activeSession.qaResponse && (
+                        <div className="glass-panel p-6 rounded-xl border border-outline-variant/30 bg-[#161616]/50 animate-step-fade-in text-[14px] leading-relaxed text-on-surface whitespace-pre-wrap">
+                          {activeSession.qaResponse}
+                        </div>
+                      )}
 
                       {activeSession.steps.length > 0 ? (
                         <ul className="flex flex-col gap-4 pl-1">
@@ -741,6 +773,7 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
                   projectId={activeSession.projectId}
                   projectName={activeSession.projectName}
                   onClose={() => setIsWorkspaceOpen(false)}
+                  status={activeSession.status}
                 />
               </div>
             )}

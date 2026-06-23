@@ -12,6 +12,8 @@ class Database:
         self.pool = None
 
     async def connect(self):
+        if self.pool is not None:
+            return
         self.pool = await asyncpg.create_pool(
             dsn=os.getenv("DATABASE_URL"),
             min_size=5,
@@ -22,6 +24,8 @@ class Database:
     async def disconnect(self):
         if self.pool is not None:
             await self.pool.close()
+            self.pool = None
+
 
     async def get_conn(self):
         if self.pool is None:
@@ -33,17 +37,19 @@ class Database:
             await self.pool.release(conn)
 
     async def _bootstrap_orchestration_schema(self):
-        migration = Path(__file__).resolve().parents[1] / "migrations" / "20260617_confidence_scoring.sql"
-        if not migration.exists():
+        migrations_dir = Path(__file__).resolve().parents[1] / "migrations"
+        if not migrations_dir.exists():
             return
-        sql = migration.read_text(encoding="utf-8")
-        statements = [stmt.strip() for stmt in sql.split(";") if stmt.strip()]
         conn = await self.get_conn()
         try:
-            for statement in statements:
-                await conn.execute(statement)
+            for migration in sorted(migrations_dir.glob("*.sql")):
+                sql = migration.read_text(encoding="utf-8")
+                statements = [stmt.strip() for stmt in sql.split(";") if stmt.strip()]
+                for statement in statements:
+                    await conn.execute(statement)
         finally:
             await self.release_conn(conn)
+
 
 
 database = Database()
