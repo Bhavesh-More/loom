@@ -13,9 +13,10 @@ type WorkspacePanelProps = {
   projectId: string
   projectName?: string
   onClose?: () => void
+  status?: string
 }
 
-export default function WorkspacePanel({ projectId, projectName = 'Project', onClose }: WorkspacePanelProps) {
+export default function WorkspacePanel({ projectId, projectName = 'Project', onClose, status }: WorkspacePanelProps) {
   const [tree, setTree] = useState<FileTreeNode[]>([])
   const [activeFilePath, setActiveFilePath] = useState<string | null>(null)
   const [fileContent, setFileContent] = useState<string | null>(null)
@@ -26,13 +27,17 @@ export default function WorkspacePanel({ projectId, projectName = 'Project', onC
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [saveSuccess, setSaveSuccess] = useState(false)
 
-  // Load tree on mount or when project changes
+  // Reset active file when project changes
   useEffect(() => {
-    loadTree()
     setActiveFilePath(null)
     setFileContent(null)
     setErrorMessage(null)
   }, [projectId])
+
+  // Load/reload tree on mount, or when project changes, or when status changes
+  useEffect(() => {
+    loadTree()
+  }, [projectId, status])
 
   const loadTree = async () => {
     setIsTreeLoading(true)
