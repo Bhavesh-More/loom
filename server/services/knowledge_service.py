@@ -389,10 +389,32 @@ class KnowledgeService:
             except Exception as e:
                 logger.warning("Failed to retrieve Phase 2 historical context: %s", e)
 
+        # Fetch relevant shared project knowledge semantically matching the task
+        shared_knowledge_items = []
+        try:
+            from knowledge.sync_manager import sync_manager
+            # Fetch up to 3 relevant shared knowledge entries
+            shared_results = await sync_manager.semantic_search_shared_knowledge(task, limit=3)
+            shared_knowledge_items = [entry for entry, score in shared_results]
+        except Exception as se:
+            logger.warning("Failed to retrieve shared knowledge for context: %s", se)
+
         # Budgeting control
         max_total_chars = 3000
         total_chars = 0
         sections = []
+
+        # 0. Format Shared Project Knowledge (800 chars cap)
+        if shared_knowledge_items:
+            shared_parts = []
+            for idx, item in enumerate(shared_knowledge_items):
+                content = item.content[:800]
+                shared_parts.append(f"- Shared Info {idx + 1} (Source: {item.source_agent}): {content}")
+            shared_text = "## Shared Project Understanding & Global Knowledge:\n" + "\n".join(shared_parts)
+            if len(shared_text) <= max_total_chars:
+                sections.append(shared_text)
+                total_chars += len(shared_text)
+
 
         # 1. Format Ingested Knowledge Base Chunks (800 chars cap)
         if isinstance(knowledge_items, list) and knowledge_items:

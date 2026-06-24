@@ -58,6 +58,28 @@ async def planner_node(state: LoomState) -> LoomState:
         for agent in agents_to_plan
     }
 
+    # Fetch historical context for agents to guide planning
+    history_block = ""
+    try:
+        from knowledge.memory_service import memory_service
+        history_items = []
+        for agent in agents_to_plan:
+            resolved_aid = await memory_service.resolve_agent_id(agent)
+            if resolved_aid:
+                # Fetch recent memories for the agent
+                memories = await memory_service.get_memories(agent_id=resolved_aid)
+                for m in memories[:3]:
+                    history_items.append(f"- Agent '{agent}' prior learning (Context: {m.context}): {m.learned_info}")
+                
+                # Fetch successful executions
+                executions = await memory_service.get_executions(agent_id=resolved_aid, status="success")
+                for e in executions[:2]:
+                    history_items.append(f"- Agent '{agent}' past successful task: '{e.task_id}'")
+        if history_items:
+            history_block = "\n\n## Historical Context & Prior Learnings:\n" + "\n".join(history_items)
+    except Exception as he:
+        print(f"[Planner] Failed to retrieve history for planner context: {he}")
+
     user_message = f"""
 Project Goal: {state['goal']}
 
@@ -65,6 +87,7 @@ Agents to plan for (ONLY these, do not add others): {json.dumps(agents_to_plan)}
 
 Precomputed repository context payload:
 {state.get('context_payload_text', '')}
+{history_block}
 
 Use this context to choose agents and task order. Do not ask downstream agents
 to rediscover the repository from scratch when the needed files are already
@@ -80,6 +103,7 @@ Produce the execution plan now.
         {"role": "system", "content": PLANNER_SYSTEM_PROMPT},
         {"role": "user",   "content": "/think\n" + user_message},
     ]
+
     log_execution_event(
         "planner.input",
         {

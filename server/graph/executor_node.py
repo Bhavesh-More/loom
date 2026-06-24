@@ -128,6 +128,7 @@ Generate the code now.
         try:
             from knowledge.memory_service import memory_service
             from knowledge.memory_models import AgentExecutionEntry, AgentDecisionEntry, AgentMemoryEntry
+            from knowledge.reflection import MemoryReflectionEngine
             resolved_aid = await memory_service.resolve_agent_id(agent_name)
             if resolved_aid:
                 # Save execution
@@ -141,13 +142,16 @@ Generate the code now.
                 )
                 saved_exec = await memory_service.save_execution(exec_entry)
                 
+                # Perform dynamic reflection using the reflection engine
+                reflections = await MemoryReflectionEngine.extract_reflections(task, output)
+                
                 # Save decision & reasoning summary
                 decision_entry = AgentDecisionEntry(
                     execution_id=saved_exec.id,
                     agent_id=resolved_aid,
-                    decision=f"Generate code to address: '{task}'",
-                    reasoning=f"Agent completed execution based on goal and repository context.",
-                    outcome="success"
+                    decision=reflections["decision"],
+                    reasoning=reflections["reasoning"],
+                    outcome=reflections["outcome"]
                 )
                 await memory_service.save_decision(decision_entry)
                 
@@ -156,10 +160,29 @@ Generate the code now.
                     agent_id=resolved_aid,
                     context=task,
                     summary=f"Completed task '{task}'",
-                    learned_info=f"In session '{chat_session_id or 'local-run'}', generated code matching: '{task}'",
+                    learned_info=reflections["learned_info"],
                     tags=["execution_learning", agent_name]
                 )
                 await memory_service.save_memory(memory_entry)
+
+                # Share knowledge via sync_manager so other agents can access this learning
+                try:
+                    from knowledge.sync_manager import sync_manager
+                    from datetime import datetime, timezone
+                    import uuid
+                    
+                    shared_entry = {
+                        "id": f"shared-{saved_exec.id or uuid.uuid4()}",
+                        "content": f"Agent '{agent_name}' learned from task '{task}': {reflections['learned_info']}",
+                        "version": 1,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "source_agent": agent_name,
+                        "priority": "medium",
+                        "tags": ["agent_sharing", agent_name]
+                    }
+                    await sync_manager.add_knowledge(shared_entry)
+                except Exception as se:
+                    logger.warning("[Executor] Failed to share knowledge dynamically: %s", se)
         except Exception as pe:
             logger.warning("[Executor] Failed to write Phase 2 execution/decision/memory logs: %s", pe)
 
@@ -184,7 +207,8 @@ Generate the code now.
         # Record failed execution in Phase 2
         try:
             from knowledge.memory_service import memory_service
-            from knowledge.memory_models import AgentExecutionEntry
+            from knowledge.memory_models import AgentExecutionEntry, AgentDecisionEntry, AgentMemoryEntry
+            from knowledge.reflection import MemoryReflectionEngine
             resolved_aid = await memory_service.resolve_agent_id(agent_name)
             if resolved_aid:
                 exec_entry = AgentExecutionEntry(
@@ -192,10 +216,33 @@ Generate the code now.
                     task_id=task,
                     input_data=user_message,
                     output_data=f"ERROR: {error_msg}",
-                    status="failed",
+                    status="failure",
                     metadata={"chat_session_id": chat_session_id or "local-run"}
                 )
-                await memory_service.save_execution(exec_entry)
+                saved_exec = await memory_service.save_execution(exec_entry)
+                
+                # Perform dynamic reflection on failure
+                reflections = await MemoryReflectionEngine.extract_reflections(task, f"ERROR: {error_msg}", error_logs=error_msg)
+                
+                # Save decision leading to failure
+                decision_entry = AgentDecisionEntry(
+                    execution_id=saved_exec.id,
+                    agent_id=resolved_aid,
+                    decision=reflections["decision"],
+                    reasoning=reflections["reasoning"],
+                    outcome=reflections["outcome"]
+                )
+                await memory_service.save_decision(decision_entry)
+                
+                # Save failure learning memory
+                memory_entry = AgentMemoryEntry(
+                    agent_id=resolved_aid,
+                    context=task,
+                    summary=f"Failed task '{task}'",
+                    learned_info=reflections["learned_info"],
+                    tags=["execution_failure", agent_name]
+                )
+                await memory_service.save_memory(memory_entry)
         except Exception as db_err:
             logger.warning("[Executor] Failed to write Phase 2 failure logs: %s", db_err)
 

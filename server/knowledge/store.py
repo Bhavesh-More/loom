@@ -16,11 +16,15 @@ class KnowledgeStore:
         conn = await self.db.get_conn()
         try:
             row = await conn.fetchrow(
-                "SELECT id, content, version, timestamp, source_agent, priority, tags FROM shared_knowledge WHERE id = $1",
+                "SELECT id, content, version, timestamp, source_agent, priority, tags, embedding FROM shared_knowledge WHERE id = $1",
                 entry_id
             )
             if row:
-                return KnowledgeEntry(**dict(row))
+                data = dict(row)
+                if data.get("embedding") is not None:
+                    from context_system.db import _parse_vector
+                    data["embedding"] = _parse_vector(data["embedding"])
+                return KnowledgeEntry(**data)
             return None
         finally:
             await self.db.release_conn(conn)
@@ -31,9 +35,16 @@ class KnowledgeStore:
         conn = await self.db.get_conn()
         try:
             rows = await conn.fetch(
-                "SELECT id, content, version, timestamp, source_agent, priority, tags FROM shared_knowledge"
+                "SELECT id, content, version, timestamp, source_agent, priority, tags, embedding FROM shared_knowledge"
             )
-            return [KnowledgeEntry(**dict(row)) for row in rows]
+            results = []
+            for row in rows:
+                data = dict(row)
+                if data.get("embedding") is not None:
+                    from context_system.db import _parse_vector
+                    data["embedding"] = _parse_vector(data["embedding"])
+                results.append(KnowledgeEntry(**data))
+            return results
         finally:
             await self.db.release_conn(conn)
 
@@ -43,29 +54,43 @@ class KnowledgeStore:
         conn = await self.db.get_conn()
         try:
             rows = await conn.fetch(
-                "SELECT id, content, version, timestamp, source_agent, priority, tags FROM shared_knowledge WHERE $1 = ANY(tags)",
+                "SELECT id, content, version, timestamp, source_agent, priority, tags, embedding FROM shared_knowledge WHERE $1 = ANY(tags)",
                 tag
             )
-            return [KnowledgeEntry(**dict(row)) for row in rows]
+            results = []
+            for row in rows:
+                data = dict(row)
+                if data.get("embedding") is not None:
+                    from context_system.db import _parse_vector
+                    data["embedding"] = _parse_vector(data["embedding"])
+                results.append(KnowledgeEntry(**data))
+            return results
         finally:
             await self.db.release_conn(conn)
 
     async def save_entry(self, entry: KnowledgeEntry) -> None:
         if not self.has_pool:
             return
+        
+        embedding_literal = None
+        if entry.embedding is not None:
+            from knowledge.memory_service import _vector_literal
+            embedding_literal = _vector_literal(entry.embedding)
+
         conn = await self.db.get_conn()
         try:
             await conn.execute(
                 """
-                INSERT INTO shared_knowledge (id, content, version, timestamp, source_agent, priority, tags)
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                INSERT INTO shared_knowledge (id, content, version, timestamp, source_agent, priority, tags, embedding)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8::vector)
                 ON CONFLICT (id) DO UPDATE SET
                     content = EXCLUDED.content,
                     version = EXCLUDED.version,
                     timestamp = EXCLUDED.timestamp,
                     source_agent = EXCLUDED.source_agent,
                     priority = EXCLUDED.priority,
-                    tags = EXCLUDED.tags
+                    tags = EXCLUDED.tags,
+                    embedding = EXCLUDED.embedding
                 """,
                 entry.id,
                 entry.content,
@@ -73,7 +98,9 @@ class KnowledgeStore:
                 entry.timestamp,
                 entry.source_agent,
                 entry.priority,
-                entry.tags
+                entry.tags,
+                embedding_literal
             )
         finally:
             await self.db.release_conn(conn)
+

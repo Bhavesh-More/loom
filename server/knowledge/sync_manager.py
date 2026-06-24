@@ -29,6 +29,14 @@ class SyncManager:
                 "action": "rejected"
             }
 
+        # Generate embedding if missing
+        if incoming.embedding is None:
+            try:
+                from knowledge.memory_embedding_service import memory_embedding_service
+                incoming.embedding = await memory_embedding_service.generate_query_embedding(incoming.content)
+            except Exception as e:
+                logger.warning("[SyncManager] Failed to generate embedding: %s", e)
+
         # 2. Retrieve existing & Resolve Conflicts
         existing = await self.store.get_entry(incoming.id)
         should_write, action = self.resolver.resolve(incoming, existing)
@@ -61,6 +69,45 @@ class SyncManager:
         """Gets tag filtered entries via cached read."""
         return await self.propagator.get_cached_tag(tag, self.store.get_entries_by_tag)
 
+    async def semantic_search_shared_knowledge(
+        self, query: str, limit: int = 5
+    ) -> List[tuple[KnowledgeEntry, float]]:
+        """Performs semantic search over the shared_knowledge table."""
+        if not self.store.has_pool:
+            return []
+        
+        # Generate query embedding
+        from knowledge.memory_embedding_service import memory_embedding_service
+        query_vector = await memory_embedding_service.generate_query_embedding(query)
+        
+        from knowledge.memory_service import _vector_literal
+        conn = await self.store.db.get_conn()
+        try:
+            rows = await conn.fetch(
+                """
+                SELECT id, content, version, timestamp, source_agent, priority, tags, embedding,
+                       1 - (embedding <=> $1::vector) AS similarity_score
+                FROM shared_knowledge
+                WHERE embedding IS NOT NULL
+                ORDER BY embedding <=> $1::vector ASC
+                LIMIT $2
+                """,
+                _vector_literal(query_vector),
+                limit
+            )
+            results = []
+            for row in rows:
+                data = dict(row)
+                score = float(data.pop("similarity_score"))
+                if data.get("embedding") is not None:
+                    from context_system.db import _parse_vector
+                    data["embedding"] = _parse_vector(data["embedding"])
+                results.append((KnowledgeEntry(**data), score))
+            return results
+        finally:
+            await self.store.db.release_conn(conn)
+
 
 # Global singleton sync manager
 sync_manager = SyncManager()
+
