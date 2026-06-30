@@ -1,11 +1,49 @@
-.venv
+# ── Secrets & environment ──────────────────────────────────────────────────────
+.venv/
 .env
+.env.*
+!.env.example
+*.pem
+*.key
 
+# ── Python — bytecode & caches ────────────────────────────────────────────────
 __pycache__/
-*.pyc
-*.pyd
+*.py[cod]
+*$py.class
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pytype/
 
+# ── Virtual environments ───────────────────────────────────────────────────────
+venv/
+env/
+ENV/
+
+# ── Packaging artefacts ────────────────────────────────────────────────────────
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+
+# ── Test & coverage output ─────────────────────────────────────────────────────
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+nosetests.xml
+
+# ── Loom runtime artefacts ─────────────────────────────────────────────────────
 outputs/
 logs/
+test_audit_logs/
+*.log
 
-.pytest_cache
+# ── Python version file (machine-specific) ────────────────────────────────────
+.python-version
+
+# ── uv lockfile — uncomment to ignore if you don't use uv for deployments ─────
+# uv.lock

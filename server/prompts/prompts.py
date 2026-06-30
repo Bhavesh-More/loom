@@ -1,3 +1,32 @@
+"""
+prompts.py — System prompts for all Loom code-generation agents.
+
+Every agent prompt is automatically wrapped with the Ponytail minimal-code
+preamble (YAGNI-first, minimal diffs, no over-engineering) via
+build_agent_prompt(). The PONYTAIL_MODE env var controls intensity:
+  "lite"  — suggest minimal alternatives alongside normal output
+  "full"  — enforce the full ladder (default)
+  "ultra" — YAGNI extremist, delete before adding
+  "off"   — no Ponytail rules injected
+"""
+import os
+
+# Lazy import to avoid hard dependency at module load time.
+def _get_ponytail_preamble() -> str:
+    try:
+        from orchestration.agents.ponytail_adapter import get_ponytail_preamble
+        mode = os.environ.get("PONYTAIL_MODE", "full")
+        return get_ponytail_preamble(mode)
+    except Exception:
+        return ""
+
+
+def build_agent_prompt(base_prompt: str) -> str:
+    """Return base_prompt with the Ponytail minimal-code preamble prepended."""
+    preamble = _get_ponytail_preamble()
+    return (preamble + base_prompt) if preamble else base_prompt
+
+
 PLANNER_SYSTEM_PROMPT = """
 You are the Loom Orchestration Planner. Your job is to take a user's project goal and a list of selected agents, then produce a strict, ordered execution plan in JSON format.
 
@@ -255,19 +284,19 @@ No explanations. No markdown. Just code.
 """
 
 AGENT_PROMPT_MAP = {
-    "github_actions":   GITHUB_ACTIONS_SYSTEM_PROMPT,
-    "web_scraping":     WEB_SCRAPING_SYSTEM_PROMPT,
-    "fastapi":          FASTAPI_SYSTEM_PROMPT,
-    "openai":           OPENAI_SYSTEM_PROMPT,
-    "auth":             AUTH_SYSTEM_PROMPT,
-    "redis":            REDIS_SYSTEM_PROMPT,
-    "supabase":         SUPABASE_SYSTEM_PROMPT,
-    "rag":              RAG_SYSTEM_PROMPT,
-    "docker":           DOCKER_SYSTEM_PROMPT,
-    "langgraph":        LANGGRAPH_SYSTEM_PROMPT,
-    "streamlit":        STREAMLIT_SYSTEM_PROMPT,
-    "postgresql":       POSTGRESQL_SYSTEM_PROMPT,
-    "pytest":           PYTEST_SYSTEM_PROMPT,
-    "mongodb":          MONGODB_SYSTEM_PROMPT,
-    "all_rounder":      ALL_ROUNDER_SYSTEM_PROMPT,
+    "github_actions":   build_agent_prompt(GITHUB_ACTIONS_SYSTEM_PROMPT),
+    "web_scraping":     build_agent_prompt(WEB_SCRAPING_SYSTEM_PROMPT),
+    "fastapi":          build_agent_prompt(FASTAPI_SYSTEM_PROMPT),
+    "openai":           build_agent_prompt(OPENAI_SYSTEM_PROMPT),
+    "auth":             build_agent_prompt(AUTH_SYSTEM_PROMPT),
+    "redis":            build_agent_prompt(REDIS_SYSTEM_PROMPT),
+    "supabase":         build_agent_prompt(SUPABASE_SYSTEM_PROMPT),
+    "rag":              build_agent_prompt(RAG_SYSTEM_PROMPT),
+    "docker":           build_agent_prompt(DOCKER_SYSTEM_PROMPT),
+    "langgraph":        build_agent_prompt(LANGGRAPH_SYSTEM_PROMPT),
+    "streamlit":        build_agent_prompt(STREAMLIT_SYSTEM_PROMPT),
+    "postgresql":       build_agent_prompt(POSTGRESQL_SYSTEM_PROMPT),
+    "pytest":           build_agent_prompt(PYTEST_SYSTEM_PROMPT),
+    "mongodb":          build_agent_prompt(MONGODB_SYSTEM_PROMPT),
+    "all_rounder":      build_agent_prompt(ALL_ROUNDER_SYSTEM_PROMPT),
 }
