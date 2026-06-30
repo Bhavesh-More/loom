@@ -1,2 +1,98 @@
+# ── Backup / scratch ──────────────────────────────────────────────────────────
 backup/
 TODO.md
+TODO
+*.bak
+*.swp
+*.swo
+
+# ── Python — bytecode & caches ────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pytype/
+
+# ── Python — virtual environments ─────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+
+# ── Python — packaging artefacts ──────────────────────────────────────────────
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+pip-wheel-metadata/
+
+# ── Python — test & coverage output ───────────────────────────────────────────
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+nosetests.xml
+pytest_cache/
+
+# ── Python — uv / pip lock (keep uv.lock if you use uv for reproducible builds)
+# uv.lock   ← uncomment to ignore; leave commented to track it
+
+# ── Secrets & environment ──────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets.json
+
+# ── Loom runtime artefacts ────────────────────────────────────────────────────
+# Audit ledger JSONL files written by AuditLedger during pipeline runs
+server/test_audit_logs/
+server/logs/
+server/outputs/
+
+# ── Node / Frontend ───────────────────────────────────────────────────────────
+node_modules/
+dist/
+dist-ssr/
+*.local
+*.tsbuildinfo
+coverage/
+
+# Lockfiles — keep package-lock.json and pnpm-lock.yaml; ignore npm debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ── Editor / IDE ──────────────────────────────────────────────────────────────
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ── OS noise ──────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── IDE reference / scratch HTML files ───────────────────────────────────────
+ide/reference.html
+ide/reference-market.html
+ide/reference-chat-middle.html
+
+# ── Misc ──────────────────────────────────────────────────────────────────────
+*.log
+*.sqlite
+*.db

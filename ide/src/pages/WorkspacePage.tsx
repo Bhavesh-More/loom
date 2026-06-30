@@ -4,6 +4,8 @@ import Sidebar, { type AppPage } from '../components/Sidebar'
 import SuggestionGrid from '../components/SuggestionGrid'
 import TopAppBar from '../components/TopAppBar'
 import WorkspacePanel from '../components/WorkspacePanel'
+import AgentTreePanel, { type TaskNode } from '../components/AgentTreePanel'
+import SemanticChangeSummary, { type AgentChange } from '../components/SemanticChangeSummary'
 import { developProjectStream, getChatDetail, type ChatMessage } from '../lib/projects'
 import { getDownloadedAgents, type AgentData } from '../lib/agents'
 
@@ -32,6 +34,11 @@ type ChatSession = {
   selectedAgentIds: string[]
   contextFiles: string[]
   qaResponse?: string
+  // Task graph for AgentTreePanel
+  taskGraphNodes: TaskNode[]
+  taskGraphLogs: string[]
+  // Per-agent semantic changes for SemanticChangeSummary
+  agentChanges: AgentChange[]
 }
 
 
@@ -144,6 +151,9 @@ function reconstructSessionFromMessages(sessionData: any, messages: ChatMessage[
     selectedAgentIds: [],
     contextFiles: [],
     qaResponse,
+    taskGraphNodes: [],
+    taskGraphLogs: [],
+    agentChanges: [],
   }
 }
 
@@ -286,6 +296,9 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
       errors: [],
       selectedAgentIds: [],
       contextFiles: [],
+      taskGraphNodes: [],
+      taskGraphLogs: [],
+      agentChanges: [],
     })
     setIsWorkspaceOpen(true)
   }
@@ -339,6 +352,9 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
       errors: [],
       selectedAgentIds,
       contextFiles: [],
+      taskGraphNodes: [],
+      taskGraphLogs: [],
+      agentChanges: [],
     }
     setActiveSession(newSession)
     setIsWorkspaceOpen(true)
@@ -378,15 +394,30 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
               files: [],
             }))
             updated.status = 'running'
+            // Parse TaskGraph nodes if provided by the planner SSE event
+            if (chunk.task_graph && Array.isArray(chunk.task_graph.nodes)) {
+              updated.taskGraphNodes = chunk.task_graph.nodes.map((n: any) => ({
+                id: n.id,
+                parentId: n.parent_id ?? null,
+                agentId: n.agent_id,
+                task: n.task,
+                dependsOn: n.depends_on ?? [],
+                capabilityScore: n.capability_score,
+                selectionReasoning: n.selection_reasoning,
+              }))
+            }
+            if (chunk.task_graph_logs && Array.isArray(chunk.task_graph_logs)) {
+              updated.taskGraphLogs = chunk.task_graph_logs
+            }
           } else if (chunk.type === 'executor') {
             const completedIdx = chunk.completed_step_idx
-            
+
             // Mark completed step
             if (updated.steps[completedIdx]) {
               updated.steps[completedIdx].status = chunk.errors && chunk.errors.length > 0 ? 'failed' : 'completed'
               updated.steps[completedIdx].files = chunk.files || []
             }
-            
+
             // Mark next step as running
             if (updated.steps[completedIdx + 1]) {
               updated.steps[completedIdx + 1].status = 'running'
@@ -394,6 +425,36 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
 
             if (chunk.errors && chunk.errors.length > 0) {
               updated.errors = [...updated.errors, ...chunk.errors]
+            }
+
+            // Build AgentChange entry from patch metadata in executor chunk
+            if (chunk.agent_id && chunk.patch) {
+              const existingIdx = updated.agentChanges.findIndex(
+                (c: { agentId: string }) => c.agentId === chunk.agent_id
+              )
+              const change = {
+                agentId: chunk.agent_id,
+                semanticSummary: chunk.patch.semantic_summary ?? [],
+                riskLevel: (chunk.patch.risk_level ?? 'low') as 'low' | 'medium' | 'high',
+                filesChanged: chunk.patch.total_files ?? 0,
+                linesChanged: chunk.patch.total_lines ?? 0,
+                withinBudget: chunk.patch.within_budget ?? true,
+                requiresApproval: chunk.patch.requires_approval ?? false,
+                buildStatus: chunk.errors && chunk.errors.length > 0 ? 'failed' : 'passed',
+                confidenceScore: chunk.confidence_score,
+              }
+              if (existingIdx >= 0) {
+                const newChanges = [...updated.agentChanges]
+                newChanges[existingIdx] = change
+                updated.agentChanges = newChanges
+              } else {
+                updated.agentChanges = [...updated.agentChanges, change]
+              }
+            }
+
+            // Update task graph logs if provided
+            if (chunk.task_graph_log) {
+              updated.taskGraphLogs = [...updated.taskGraphLogs, chunk.task_graph_log]
             }
           } else if (chunk.type === 'file_writer') {
             updated.workspacePath = chunk.workspace_path || ''
@@ -530,6 +591,15 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
                         </div>
                       )}
 
+                      {/* Agent Execution Tree — shown when task graph is available */}
+                      {activeSession.taskGraphNodes.length > 0 && (
+                        <AgentTreePanel
+                          nodes={activeSession.taskGraphNodes}
+                          logs={activeSession.taskGraphLogs}
+                          isRunning={isDeveloping}
+                        />
+                      )}
+
                       {activeSession.steps.length > 0 ? (
                         <ul className="flex flex-col gap-4 pl-1">
                           {activeSession.steps.map((step, idx) => {
@@ -618,6 +688,12 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
                           </ul>
                         </div>
                       )}
+
+                      {/* Semantic Change Summary — shown after run completes */}
+                      <SemanticChangeSummary
+                        changes={activeSession.agentChanges}
+                        isVisible={activeSession.status === 'completed' || activeSession.status === 'failed'}
+                      />
                     </div>
                   </div>
                 </div>
