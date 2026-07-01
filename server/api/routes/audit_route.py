@@ -61,6 +61,9 @@ class RunAuditSummary(BaseModel):
 # Routes
 # ---------------------------------------------------------------------------
 
+import json
+from datetime import datetime
+
 @router.get("/{run_id}", response_model=list[AuditEntryResponse])
 async def get_audit_entries(run_id: str) -> list[dict[str, Any]]:
     """
@@ -73,7 +76,28 @@ async def get_audit_entries(run_id: str) -> list[dict[str, Any]]:
             status_code=404,
             detail=f"No audit entries found for run_id: {run_id}",
         )
-    return entries
+    
+    formatted = []
+    for entry in entries:
+        d = dict(entry)
+        # Parse semantic_summary if it is a JSON string
+        summary = d.get("semantic_summary", [])
+        if isinstance(summary, str):
+            try:
+                summary = json.loads(summary)
+            except Exception:
+                summary = [summary]
+        
+        # Format created_at to ISO string if it is a datetime object
+        created_at = d.get("created_at", "")
+        if isinstance(created_at, datetime):
+            created_at = created_at.isoformat()
+            
+        d["semantic_summary"] = summary
+        d["created_at"] = created_at
+        formatted.append(d)
+        
+    return formatted
 
 
 @router.get("/{run_id}/summary", response_model=RunAuditSummary)
@@ -97,24 +121,32 @@ async def get_audit_summary(run_id: str) -> RunAuditSummary:
     agents_summary: list[dict[str, Any]] = []
 
     for entry in entries:
-        risk = entry.get("risk_level", "low")
+        d = dict(entry)
+        risk = d.get("risk_level", "low")
         risk_dist[risk] = risk_dist.get(risk, 0) + 1
-        total_files += entry.get("files_changed", 0)
-        total_lines += entry.get("lines_changed", 0)
-        if not entry.get("within_budget", True):
+        total_files += d.get("files_changed", 0)
+        total_lines += d.get("lines_changed", 0)
+        if not d.get("within_budget", True):
             violations += 1
-        if entry.get("requires_approval", False):
+        if d.get("requires_approval", False):
             approval_needed += 1
 
+        summary = d.get("semantic_summary", [])
+        if isinstance(summary, str):
+            try:
+                summary = json.loads(summary)
+            except Exception:
+                summary = [summary]
+
         agents_summary.append({
-            "agent_id": entry.get("agent_id", ""),
+            "agent_id": d.get("agent_id", ""),
             "risk_level": risk,
-            "semantic_summary": entry.get("semantic_summary", []),
-            "files_changed": entry.get("files_changed", 0),
-            "lines_changed": entry.get("lines_changed", 0),
-            "within_budget": entry.get("within_budget", True),
-            "confidence_score": entry.get("confidence_score"),
-            "build_status": entry.get("build_status", "unknown"),
+            "semantic_summary": summary,
+            "files_changed": d.get("files_changed", 0),
+            "lines_changed": d.get("lines_changed", 0),
+            "within_budget": d.get("within_budget", True),
+            "confidence_score": d.get("confidence_score"),
+            "build_status": d.get("build_status", "unknown"),
         })
 
     return RunAuditSummary(
