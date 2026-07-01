@@ -182,19 +182,22 @@ class ProjectReader:
             return []
 
         async def _rg_files() -> list[str]:
-            args = ["rg", "--files"]
-            for glob in IGNORE_GLOBS:
-                args.extend(["--glob", glob])
-            args.append(repo_path)
-            proc = await asyncio.create_subprocess_exec(
-                *args,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            stdout, _stderr = await proc.communicate()
-            if proc.returncode not in (0, 1):
+            try:
+                args = ["rg", "--files"]
+                for glob in IGNORE_GLOBS:
+                    args.extend(["--glob", glob])
+                args.append(repo_path)
+                proc = await asyncio.create_subprocess_exec(
+                    *args,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                stdout, _stderr = await proc.communicate()
+                if proc.returncode not in (0, 1):
+                    return []
+                return [line for line in stdout.decode().splitlines() if line.strip()]
+            except Exception:
                 return []
-            return [line for line in stdout.decode().splitlines() if line.strip()]
 
         def _find() -> list[FileMatch]:
             root = Path(repo_path)
@@ -343,39 +346,79 @@ class ProjectReader:
         return sorted(by_path.values(), key=lambda item: float(item.get("score") or 0), reverse=True)
 
     async def _search_term(self, repo_path: str, term: str) -> list[FileMatch]:
-        args = ["rg", "--json", "--ignore-case"]
-        for glob in IGNORE_GLOBS:
-            args.extend(["--glob", glob])
-        args.extend([term, repo_path])
-        proc = await asyncio.create_subprocess_exec(
-            *args,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, _stderr = await proc.communicate()
-        if proc.returncode not in (0, 1):
-            return []
+        try:
+            args = ["rg", "--json", "--ignore-case"]
+            for glob in IGNORE_GLOBS:
+                args.extend(["--glob", glob])
+            args.extend([term, repo_path])
+            proc = await asyncio.create_subprocess_exec(
+                *args,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, _stderr = await proc.communicate()
+            if proc.returncode not in (0, 1):
+                return []
+            grouped: dict[str, dict] = {}
+            for line in stdout.decode().splitlines():
+                try:
+                    payload = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if payload.get("type") != "match":
+                    continue
+                data = payload.get("data", {})
+                path = data.get("path", {}).get("text")
+                if not path:
+                    continue
+                absolute = str(Path(path).resolve())
+                if self._is_low_value_path(absolute):
+                    continue
+                group = grouped.setdefault(absolute, {"lines": [], "snippets": [], "hits": 0})
+                group["hits"] += 1
+                group["lines"].append(int(data.get("line_number", 0)))
+                text = data.get("lines", {}).get("text", "").strip()
+                if text and len(group["snippets"]) < 3:
+                    group["snippets"].append(text[:300])
+            return [
+                FileMatch(
+                    path=path,
+                    score=min(1.0, 0.35 + group["hits"] / 10),
+                    line_numbers=group["lines"][:10],
+                    snippets=group["snippets"],
+                    matched_terms=[term],
+                )
+                for path, group in grouped.items()
+            ]
+        except Exception:
+            return await self._fallback_search_term(repo_path, term)
+
+    async def _fallback_search_term(self, repo_path: str, term: str) -> list[FileMatch]:
+        from context_system.graph_builder import list_source_files
+
+        source_files = await list_source_files(repo_path)
         grouped: dict[str, dict] = {}
-        for line in stdout.decode().splitlines():
+        term_lower = term.lower()
+
+        for file_path in source_files:
+            if self._is_low_value_path(file_path):
+                continue
             try:
-                payload = json.loads(line)
-            except json.JSONDecodeError:
+                content = await asyncio.to_thread(
+                    Path(file_path).read_text, encoding="utf-8", errors="ignore"
+                )
+            except Exception:
                 continue
-            if payload.get("type") != "match":
-                continue
-            data = payload.get("data", {})
-            path = data.get("path", {}).get("text")
-            if not path:
-                continue
-            absolute = str(Path(path).resolve())
-            if self._is_low_value_path(absolute):
-                continue
-            group = grouped.setdefault(absolute, {"lines": [], "snippets": [], "hits": 0})
-            group["hits"] += 1
-            group["lines"].append(int(data.get("line_number", 0)))
-            text = data.get("lines", {}).get("text", "").strip()
-            if text and len(group["snippets"]) < 3:
-                group["snippets"].append(text[:300])
+
+            lines = content.splitlines()
+            for idx, line in enumerate(lines, 1):
+                if term_lower in line.lower():
+                    group = grouped.setdefault(file_path, {"lines": [], "snippets": [], "hits": 0})
+                    group["hits"] += 1
+                    group["lines"].append(idx)
+                    if line.strip() and len(group["snippets"]) < 3:
+                        group["snippets"].append(line.strip()[:300])
+
         return [
             FileMatch(
                 path=path,

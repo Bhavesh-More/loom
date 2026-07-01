@@ -1,4 +1,4 @@
-# Logs
+# ── Logs ───────────────────────────────────────────────────────────────────────
 logs
 *.log
 npm-debug.log*
@@ -7,15 +7,25 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
+# ── Build output ───────────────────────────────────────────────────────────────
+node_modules/
+dist/
+dist-ssr/
 *.local
+*.tsbuildinfo
 
-# Editor directories and files
+# ── Secrets & environment ──────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Test & coverage output ─────────────────────────────────────────────────────
+coverage/
+
+# ── Editor directories and files ───────────────────────────────────────────────
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
 *.suo
 *.ntvs*
@@ -23,8 +33,12 @@ dist-ssr
 *.sln
 *.sw?
 
+# ── OS noise ───────────────────────────────────────────────────────────────────
+Thumbs.db
+desktop.ini
 
+# ── Reference / scratch HTML files (design-only, not part of the app) ──────────
 reference.html
 reference-market.html
 reference-chat-middle.html
-TODO
+TODO

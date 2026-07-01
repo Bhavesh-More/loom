@@ -10,7 +10,9 @@ from db.database import database
 from orchestration.agents.stubs import AGENT_STUBS
 from orchestration.contracts.contract_builder import ContractBuilder
 from orchestration.contracts.contract_validator import ContractValidator
+from orchestration.generation.patch_generator import PatchGenerator
 from orchestration.observability import alerts, metrics
+from orchestration.observability.audit_ledger import AuditLedger
 from orchestration.planning.master_planner import MasterPlanner
 from orchestration.planning.plan_schema import (
     AgentResult,
@@ -33,6 +35,7 @@ class PipelineOrchestrator:
         checkpoint: PipelineCheckpoint | None = None,
         scorer: GenericConfidenceScorer | None = None,
         agent_registry: dict[str, AgentCallable] | None = None,
+        patch_generator: PatchGenerator | None = None,
     ) -> None:
         self.planner = planner or MasterPlanner()
         self.checkpoint = checkpoint or PipelineCheckpoint()
@@ -41,6 +44,8 @@ class PipelineOrchestrator:
         self.contract_builder = ContractBuilder()
         self.contract_validator = ContractValidator()
         self.failure_handler = FailureHandler()
+        self.patch_generator = patch_generator or PatchGenerator()
+        self.audit_ledger = AuditLedger()
 
     async def run_pipeline(
         self,
@@ -168,11 +173,55 @@ class PipelineOrchestrator:
                 retry_hint = "Contract validation failed: " + "; ".join(contract_errors)
                 continue
 
-            await self.checkpoint.save(run_id, agent_id, output, scoring.score)
+            # --- Patch generation & diff budget check ---
+            # Extract the text content from the agent output to run through
+            # the patch generator (works with both 'content' field and full dicts).
+            agent_text = output.get("content", "") if isinstance(output.get("content"), str) else ""
+            if not agent_text:
+                # Fallback: JSON-encode the whole output as the patch text
+                agent_text = json.dumps(output, default=str)
+            patch_result = self.patch_generator.process(
+                agent_output=agent_text,
+                task_description=spec.task,
+            )
+            # Attach patch metadata to output so it flows to checkpoint + audit ledger
+            output_with_patch = {
+                **output,
+                "_patch": {
+                    "task_type": patch_result.task_type,
+                    "total_files": patch_result.total_files,
+                    "total_lines": patch_result.total_lines,
+                    "within_budget": patch_result.budget.within_budget if patch_result.budget else True,
+                    "requires_approval": patch_result.budget.requires_approval if patch_result.budget else False,
+                    "violation_reason": patch_result.budget.violation_reason if patch_result.budget else None,
+                    "risk_level": self.patch_generator.infer_risk_level(patch_result.patches),
+                    "semantic_summary": patch_result.semantic_summary,
+                    "search_replace_blocks": patch_result.search_replace_blocks,
+                },
+            }
+            if patch_result.budget and not patch_result.budget.within_budget:
+                alerts.contract_validation_failed(
+                    run_id, agent_id, "diff_budget",
+                    [patch_result.budget.violation_reason or "Diff budget exceeded"],
+                )
+            metrics.agent_score(run_id, agent_id + "_patch_files", patch_result.total_files)
+            metrics.agent_score(run_id, agent_id + "_patch_lines", patch_result.total_lines)
+
+            await self.checkpoint.save(run_id, agent_id, output_with_patch, scoring.score)
+            await self.audit_ledger.record(
+                run_id=run_id,
+                agent_id=agent_id,
+                task_description=spec.task,
+                patch_metadata=output_with_patch.get("_patch"),
+                validation_passed=scoring.passed,
+                confidence_score=scoring.score,
+                integration_status="merged",
+                build_status="passed" if scoring.passed else "failed",
+            )
             return AgentResult(
                 agent_id=agent_id,
                 status="success",
-                output=output,
+                output=output_with_patch,
                 score=scoring.score,
                 attempts=attempt,
             )

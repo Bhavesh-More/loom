@@ -9,9 +9,10 @@ type SidebarProps = {
   onNavigate: (page: AppPage) => void
   activeChatId?: string | null
   onSelectChat?: (chatId: string) => void
+  onSelectProject?: (projectId: string, projectName: string) => void
 }
 
-function Sidebar({ activePage, onNavigate, activeChatId, onSelectChat }: SidebarProps) {
+function Sidebar({ activePage, onNavigate, activeChatId, onSelectChat, onSelectProject }: SidebarProps) {
   const [projects, setProjects] = useState<Project[]>([])
   const [chats, setChats] = useState<Chat[]>([])
   const [downloadedAgents, setDownloadedAgents] = useState<AgentData[]>([])
@@ -217,6 +218,12 @@ function Sidebar({ activePage, onNavigate, activeChatId, onSelectChat }: Sidebar
                   className="flex items-center gap-3 text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary px-4 py-2 transition-all font-body-sm text-body-sm hover:bg-surface-container-highest dark:hover:bg-surface-container-high cursor-pointer"
                   href="#"
                   key={project.id}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    if (onSelectProject) {
+                      onSelectProject(project.id, project.name)
+                    }
+                  }}
                 >
                   <span className="material-symbols-outlined text-[18px] opacity-70">folder</span>
                   <span className="truncate">{project.name}</span>

@@ -55,7 +55,7 @@ You also need:
 ### 2. Install Backend Dependencies
 
 ```bash
-cd /Users/bhaveshmore/Documents/Hackathon/loom/server
+cd <path>/loom/server
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -106,7 +106,7 @@ Redis is optional. If `REDIS_URL` is missing, checkpoints use the in-memory fall
 ### 5. Start the Backend
 
 ```bash
-cd /Users/bhaveshmore/Documents/Hackathon/loom/server
+cd <path>/loom/server
 ./.venv/bin/uvicorn main:app --reload
 ```
 
@@ -117,7 +117,7 @@ Open the API docs:
 ### 6. Start the Frontend
 
 ```bash
-cd /Users/bhaveshmore/Documents/Hackathon/loom/ide
+cd <path>/loom/ide
 npm install
 npm run dev
 ```
@@ -132,7 +132,7 @@ Use `POST /context/analyze` in Swagger with:
 
 ```json
 {
-  "repo_path": "/Users/bhaveshmore/Documents/Hackathon/loom/ide",
+  "repo_path": "<path>/loom/ide",
   "prompt": "add a dark mode toggle in the top app bar and persist the selected theme",
   "task_id": "context-smoke-1",
   "token_budget": 4096
