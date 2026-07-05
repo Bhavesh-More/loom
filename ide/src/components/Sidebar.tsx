@@ -1,40 +1,75 @@
 import { useEffect, useState, useRef } from 'react'
 import { getProjects, getChats, type Project, type Chat } from '../lib/projects'
-import { getDownloadedAgents, type AgentData } from '../lib/agents'
 
 export type AppPage = 'chat' | 'marketplace'
 
 type SidebarProps = {
   activePage: AppPage
-  onNavigate: (page: AppPage) => void
+  onNavigate: (page: AppPage, agentId?: string | null) => void
   activeChatId?: string | null
   onSelectChat?: (chatId: string) => void
   onSelectProject?: (projectId: string, projectName: string) => void
+  onSelectAgents?: () => void
+  isAgentsActive?: boolean
+  onSelectProjectsList?: () => void
+  isProjectsListActive?: boolean
 }
 
-function Sidebar({ activePage, onNavigate, activeChatId, onSelectChat, onSelectProject }: SidebarProps) {
+function Sidebar({
+  activePage,
+  onNavigate,
+  activeChatId,
+  onSelectChat,
+  onSelectProject,
+  onSelectAgents,
+  isAgentsActive = false,
+  onSelectProjectsList,
+  isProjectsListActive = false,
+}: SidebarProps) {
   const [projects, setProjects] = useState<Project[]>([])
   const [chats, setChats] = useState<Chat[]>([])
-  const [downloadedAgents, setDownloadedAgents] = useState<AgentData[]>([])
   const [isAddingProject, setIsAddingProject] = useState(false)
   const [newProjectPath, setNewProjectPath] = useState('')
   const [newProjectName, setNewProjectName] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const [isProjectsExpanded, setIsProjectsExpanded] = useState(() => {
+    const persisted = localStorage.getItem('sidebar_projects_expanded')
+    return persisted !== null ? persisted === 'true' : true
+  })
+  const [isChatsExpanded, setIsChatsExpanded] = useState(() => {
+    const persisted = localStorage.getItem('sidebar_chats_expanded')
+    return persisted !== null ? persisted === 'true' : true
+  })
+
+  const toggleProjects = () => {
+    setIsProjectsExpanded((prev) => {
+      const next = !prev
+      localStorage.setItem('sidebar_projects_expanded', String(next))
+      return next
+    })
+  }
+
+  const toggleChats = () => {
+    setIsChatsExpanded((prev) => {
+      const next = !prev
+      localStorage.setItem('sidebar_chats_expanded', String(next))
+      return next
+    })
+  }
 
   useEffect(() => {
     let active = true
 
     async function loadData(force = false) {
       try {
-        const [projectData, chatData, downloadedAgentData] = await Promise.all([
+        const [projectData, chatData] = await Promise.all([
           getProjects(force),
           getChats(force),
-          getDownloadedAgents(force),
         ])
         if (active) {
           setProjects(projectData)
           setChats(chatData)
-          setDownloadedAgents(downloadedAgentData)
         }
       } catch (error) {
         console.error('Failed to fetch sidebar data', error)
@@ -45,17 +80,14 @@ function Sidebar({ activePage, onNavigate, activeChatId, onSelectChat, onSelectP
 
     const handleProjectCreated = () => void loadData(true)
     const handleChatCreated = () => void loadData(true)
-    const handleAgentsChanged = () => void loadData(true)
 
     window.addEventListener('project-created', handleProjectCreated)
     window.addEventListener('chat-created', handleChatCreated)
-    window.addEventListener('agents-changed', handleAgentsChanged)
 
     return () => {
       active = false
       window.removeEventListener('project-created', handleProjectCreated)
       window.removeEventListener('chat-created', handleChatCreated)
-      window.removeEventListener('agents-changed', handleAgentsChanged)
     }
   }, [])
 
@@ -190,20 +222,25 @@ function Sidebar({ activePage, onNavigate, activeChatId, onSelectChat, onSelectP
             </a> */}
 
             {/* ── Projects ───────────────────────────────────────── */}
-            <div
-              className="mt-2 p-2 px-4 mb-1 flex items-center justify-between cursor-pointer hover:bg-surface-container-high dark:hover:bg-surface-container-high rounded px-2"
-              onClick={handleAddProjectClick}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => e.key === 'Enter' && handleAddProjectClick()}
-              title="Add existing project"
-            >
-              <span className="text-label-caps text-on-surface-variant opacity-70 text-[11px] tracking-widest">
-                Projects
-              </span>
-              <span className="material-symbols-outlined text-[16px] text-on-surface-variant opacity-70 hover:text-primary dark:hover:text-primary transition-colors">
+            <div className="mt-2 px-4 mb-1 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={toggleProjects}
+                className="flex items-center gap-1 text-left font-label-caps text-label-caps text-on-surface-variant opacity-70 text-[11px] tracking-widest hover:opacity-100 transition-opacity cursor-pointer uppercase font-semibold select-none"
+              >
+                <span className="material-symbols-outlined text-[14px]">
+                  {isProjectsExpanded ? 'keyboard_arrow_down' : 'keyboard_arrow_right'}
+                </span>
+                <span>Projects</span>
+              </button>
+              <button
+                onClick={handleAddProjectClick}
+                type="button"
+                className="material-symbols-outlined text-[16px] text-on-surface-variant opacity-70 hover:text-primary dark:hover:text-primary transition-colors cursor-pointer"
+                title="Add existing project"
+              >
                 add
-              </span>
+              </button>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -212,24 +249,43 @@ function Sidebar({ activePage, onNavigate, activeChatId, onSelectChat, onSelectP
               />
             </div>
 
-            {projects.length > 0 ? (
-              projects.map((project) => (
-                <a
-                  className="flex items-center gap-3 text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary px-4 py-2 transition-all font-body-sm text-body-sm hover:bg-surface-container-highest dark:hover:bg-surface-container-high cursor-pointer"
-                  href="#"
-                  key={project.id}
-                  onClick={(e) => {
-                    e.preventDefault()
-                    if (onSelectProject) {
-                      onSelectProject(project.id, project.name)
-                    }
-                  }}
-                >
-                  <span className="material-symbols-outlined text-[18px] opacity-70">folder</span>
-                  <span className="truncate">{project.name}</span>
-                </a>
-              ))
-            ) : null}
+            {isProjectsExpanded && (
+              <div className="flex flex-col gap-0.5">
+                {projects.length > 0 ? (
+                  projects.slice(0, 7).map((project) => (
+                    <a
+                      className="flex items-center gap-3 text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary px-4 py-2 transition-all font-body-sm text-body-sm hover:bg-surface-container-highest dark:hover:bg-surface-container-high cursor-pointer"
+                      href="#"
+                      key={project.id}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        if (onSelectProject) {
+                          onSelectProject(project.id, project.name)
+                        }
+                      }}
+                    >
+                      <span className="material-symbols-outlined text-[18px] opacity-70">folder</span>
+                      <span className="truncate">{project.name}</span>
+                    </a>
+                  ))
+                ) : null}
+
+                {projects.length > 7 && (
+                  <button
+                    type="button"
+                    onClick={onSelectProjectsList}
+                    className={`flex items-center gap-3 px-4 py-2 font-body-sm text-body-sm transition-all text-left w-full rounded-lg ${
+                      isProjectsListActive
+                        ? 'text-primary dark:text-primary border-l-2 border-primary bg-surface-container-high dark:bg-surface-container-highest font-medium'
+                        : 'text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary hover:bg-surface-container-highest dark:hover:bg-surface-container-high'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[18px] opacity-70">more_horiz</span>
+                    <span>View all {projects.length} projects</span>
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Add Project Modal/Dialog */}
             {isAddingProject && (
@@ -263,90 +319,70 @@ function Sidebar({ activePage, onNavigate, activeChatId, onSelectChat, onSelectP
               </div>
             )}
 
-            <div className="mt-5 px-4 mb-2">
-              <span className="font-label-caps text-label-caps text-on-surface-variant opacity-70 text-[11px] tracking-widest ">
-                Agents
-              </span>
+            {/* Agents Row Button */}
+            <div className="mt-5 px-3 mb-2">
+              <button
+                type="button"
+                onClick={onSelectAgents}
+                className={`flex items-center gap-3 px-4 py-2 font-body-sm text-body-sm transition-all text-left w-full rounded-lg ${
+                  isAgentsActive
+                    ? 'text-primary dark:text-primary border-l-2 border-primary bg-surface-container-high dark:bg-surface-container-highest font-medium'
+                    : 'text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary hover:bg-surface-container-highest dark:hover:bg-surface-container-high'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[18px]">smart_toy</span>
+                <span>Agents</span>
+              </button>
             </div>
-
-            {downloadedAgents.length > 0 ? (
-              <div className="px-3 flex flex-col gap-2">
-                {downloadedAgents.slice(0, 4).map((agent) => (
-                  <div
-                    key={agent.id}
-                    className="rounded-xl border border-outline-variant/30 bg-surface-container-low px-3 py-3"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className={`market-icon market-icon--${agent.tone} !w-10 !h-10 !rounded-lg shrink-0`}>
-                        <span className="material-symbols-outlined text-[18px]">{agent.icon}</span>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-[12px] font-medium text-on-surface truncate">
-                            {agent.name}
-                          </span>
-                          <span className="text-[10px] text-primary shrink-0">Downloaded</span>
-                        </div>
-                        <div className="mt-1 text-[10px] text-on-surface-variant">
-                          {agent.category} · {agent.type}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                {downloadedAgents.length > 4 ? (
-                  <button
-                    className="text-left px-2 py-1 text-[11px] text-on-surface-variant hover:text-primary transition-colors"
-                    onClick={() => onNavigate('marketplace')}
-                    type="button"
-                  >
-                    View all {downloadedAgents.length} agents
-                  </button>
-                ) : null}
-              </div>
-            ) : (
-              <span className="px-4 py-1.5 text-[12px] text-on-surface-variant italic">
-                No agents downloaded yet
-              </span>
-            )}
 
 
             {/* ── Chats ─────────────────────────────────────────── */}
-            <div className="mt-5 px-4 mb-1">
-              <span className="font-label-caps text-label-caps text-on-surface-variant opacity-70 text-[11px] tracking-widest ">
-                Chats
-              </span>
+            <div className="mt-5 px-4 mb-1 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={toggleChats}
+                className="flex items-center gap-1 text-left font-label-caps text-label-caps text-on-surface-variant opacity-70 text-[11px] tracking-widest hover:opacity-100 transition-opacity cursor-pointer uppercase font-semibold select-none"
+              >
+                <span className="material-symbols-outlined text-[14px]">
+                  {isChatsExpanded ? 'keyboard_arrow_down' : 'keyboard_arrow_right'}
+                </span>
+                <span>Chats</span>
+              </button>
             </div>
 
-            {chats.length > 0 ? (
-              chats.map((chat) => {
-                const isActive = activeChatId === chat.id
-                return (
-                  <button
-                    className={`flex items-center gap-3 px-4 py-2 font-body-sm text-body-sm transition-all text-left w-full ${
-                      isActive
-                        ? 'text-primary dark:text-primary border-l-2 border-primary bg-surface-container-high dark:bg-surface-container-highest font-medium'
-                        : 'text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary hover:bg-surface-container-highest dark:hover:bg-surface-container-high'
-                    }`}
-                    onClick={() => {
-                      onNavigate('chat')
-                      if (onSelectChat) {
-                        onSelectChat(chat.id)
-                      }
-                    }}
-                    type="button"
-                    key={chat.id}
-                    title={chat.title}
-                  >
-                    <span className="material-symbols-outlined text-[18px] opacity-70">chat</span>
-                    <span className="truncate">{chat.title}</span>
-                  </button>
-                )
-              })
-            ) : (
-              <span className="px-4 py-1.5 text-[12px] text-on-surface-variant italic">
-                No chats yet
-              </span>
+            {isChatsExpanded && (
+              <div className="flex flex-col gap-0.5">
+                {chats.length > 0 ? (
+                  chats.map((chat) => {
+                    const isActive = activeChatId === chat.id
+                    return (
+                      <button
+                        className={`flex items-center gap-3 px-4 py-2 font-body-sm text-body-sm transition-all text-left w-full ${
+                          isActive
+                            ? 'text-primary dark:text-primary border-l-2 border-primary bg-surface-container-high dark:bg-surface-container-highest font-medium'
+                            : 'text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary hover:bg-surface-container-highest dark:hover:bg-surface-container-high'
+                        }`}
+                        onClick={() => {
+                          onNavigate('chat')
+                          if (onSelectChat) {
+                            onSelectChat(chat.id)
+                          }
+                        }}
+                        type="button"
+                        key={chat.id}
+                        title={chat.title}
+                      >
+                        <span className="material-symbols-outlined text-[18px] opacity-70">chat</span>
+                        <span className="truncate">{chat.title}</span>
+                      </button>
+                    )
+                  })
+                ) : (
+                  <span className="px-4 py-1.5 text-[12px] text-on-surface-variant italic">
+                    No chats yet
+                  </span>
+                )}
+              </div>
             )}
           </>
         )}

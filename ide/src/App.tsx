@@ -6,12 +6,28 @@ import './App.css'
 
 function App() {
   const [page, setPage] = useState<AppPage>('chat')
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null)
 
-  if (page === 'marketplace') {
-    return <MarketplacePage onNavigate={setPage} />
+  const handleNavigate = (newPage: AppPage, agentId?: string | null) => {
+    setPage(newPage)
+    setSelectedAgentId(agentId || null)
   }
 
-  return <WorkspacePage activePage={page} onNavigate={setPage} />
+  if (page === 'marketplace') {
+    return (
+      <MarketplacePage
+        onNavigate={handleNavigate}
+        initialSelectedAgentId={selectedAgentId}
+      />
+    )
+  }
+
+  return (
+    <WorkspacePage
+      activePage={page}
+      onNavigate={handleNavigate}
+    />
+  )
 }
 
 export default App
