@@ -224,16 +224,9 @@ function findLastIndex<T>(
 function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
   const [activeSession, setActiveSession] = useState<ChatSession | null>(null);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
-  const [followUpText, setFollowUpText] = useState("");
-  const [followUpModel, setFollowUpModel] = useState("llama-3.3-70b");
   const timerRef = useRef<number | null>(null);
 
   const [downloadedAgents, setDownloadedAgents] = useState<AgentData[]>([]);
-  const [followUpSelectedAgents, setFollowUpSelectedAgents] = useState<
-    string[]
-  >([]);
-  const [isAgentDropdownOpen, setIsAgentDropdownOpen] = useState(false);
-  const agentDropdownRef = useRef<HTMLDivElement>(null);
 
   const [confirmDeleteAgent, setConfirmDeleteAgent] =
     useState<AgentData | null>(null);
@@ -313,54 +306,6 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
       window.removeEventListener("agents-changed", handleAgentsChanged);
     };
   }, []);
-
-  // Close agent dropdown on click outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        agentDropdownRef.current &&
-        !agentDropdownRef.current.contains(event.target as Node)
-      ) {
-        setIsAgentDropdownOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
-
-  // Sync selected agents when activeSession changes
-  useEffect(() => {
-    if (activeSession) {
-      setFollowUpSelectedAgents(activeSession.selectedAgentIds || []);
-    } else {
-      setFollowUpSelectedAgents([]);
-    }
-  }, [activeSession?.projectId, activeSession?.selectedAgentIds]);
-
-  // Task 4: Ripple effect helper
-  const createRipple = (e: React.MouseEvent<HTMLButtonElement>) => {
-    const button = e.currentTarget;
-    const ripple = document.createElement("span");
-    const rect = button.getBoundingClientRect();
-    const size = Math.max(rect.width, rect.height);
-    const x = e.clientX - rect.left - size / 2;
-    const y = e.clientY - rect.top - size / 2;
-
-    ripple.style.width = ripple.style.height = `${size}px`;
-    ripple.style.left = `${x}px`;
-    ripple.style.top = `${y}px`;
-    ripple.style.borderRadius = "50%";
-    ripple.style.position = "absolute";
-    ripple.style.backgroundColor = "rgba(255, 255, 255, 0.4)";
-    ripple.style.transform = "scale(0)";
-    ripple.style.animation = "rippleAnimation 0.6s ease-out";
-    ripple.style.pointerEvents = "none";
-
-    button.appendChild(ripple);
-    setTimeout(() => ripple.remove(), 600);
-  };
 
   const handleSelectChat = async (chatId: string) => {
     setActiveChatId(chatId);
@@ -666,18 +611,19 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
     await runPrompt(projectId, promptText, selectedAgentIds);
   };
 
-  const handleSendFollowUp = async () => {
-    const promptText = followUpText.trim();
-    if (!promptText || isDeveloping || !activeSession?.projectId) {
+  const handleSendActivePrompt = async (
+    projectId: string,
+    promptText: string,
+    selectedAgentIds: string[],
+  ) => {
+    if (!promptText.trim() || isDeveloping || !activeSession?.projectId) {
       return;
     }
-    const projectId = activeSession.projectId;
     const agentIds =
-      followUpSelectedAgents.length > 0
-        ? followUpSelectedAgents
+      selectedAgentIds.length > 0
+        ? selectedAgentIds
         : activeSession.selectedAgentIds || [];
-    setFollowUpText("");
-    await runPrompt(projectId, promptText, agentIds, activeChatId);
+    await runPrompt(projectId, promptText.trim(), agentIds, activeChatId);
   };
 
   const isDeveloping = activeSession
@@ -945,181 +891,18 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
                 </div>
               </div>
 
-              {/* Sticky Chat Input Box at the Bottom of Left Pane */}
+              {/* Sticky Prompt Composer at the Bottom of Left Pane */}
               <div className="absolute bottom-6 left-0 right-0 z-10 flex justify-center px-5 pointer-events-none">
-                <div className="w-full max-w-205 bg-[#171717] border border-[#2c2c2c] rounded-[22px] flex flex-col shadow-2xl overflow-hidden pointer-events-auto">
-                  <textarea
-                    className="block w-full min-h-20.5 max-h-36 bg-transparent border-none text-primary placeholder-on-surface-variant/45 px-5 pt-4 pb-2 focus:ring-0 focus:border-transparent outline-none text-[15px] leading-relaxed resize-none"
-                    value={followUpText}
-                    onChange={(e) => setFollowUpText(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        void handleSendFollowUp();
-                      }
-                    }}
+                <div className="w-full max-w-205 pointer-events-auto">
+                  <PromptComposer
+                    selectedProjectId={activeSession.projectId || selectedProjectId}
+                    setSelectedProjectId={setSelectedProjectId}
+                    onSendPrompt={handleSendActivePrompt}
+                    isDevelopingProps={isDeveloping}
+                    defaultSelectedAgentIds={activeSession.selectedAgentIds}
+                    lockProjectSelection
                     placeholder="Ask for follow-up changes"
-                    rows={2}
-                    disabled={isDeveloping}
                   />
-                  <div className="flex flex-wrap items-center justify-between px-4 pb-3 gap-2">
-                    <div className="flex flex-wrap items-center gap-2 min-w-0">
-                      <button
-                        className="w-8 h-8 shrink-0 flex items-center justify-center text-on-surface-variant hover:text-white rounded-lg hover:bg-[#262626] transition-colors"
-                        type="button"
-                        aria-label="Add attachment"
-                      >
-                        <span className="material-symbols-outlined text-[20px]">
-                          add
-                        </span>
-                      </button>
-                      <div className="relative shrink-0">
-                        <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-[16px] text-on-surface-variant">
-                          keyboard_arrow_down
-                        </span>
-                      </div>
-                      <div className="h-9 flex items-center gap-1.5 text-[12px] text-on-surface-variant px-3 rounded-lg border border-outline-variant/30 bg-[#171717] min-w-37.5 max-w-60">
-                        <span className="material-symbols-outlined text-[15px]">
-                          folder
-                        </span>
-                        <span className="truncate">
-                          {activeSession.projectName || "Selected project"}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap items-center justify-end gap-2 min-w-0">
-                      <div className="relative shrink-0">
-                        <select
-                          className="h-9 text-[12px] text-on-surface-variant font-code-md bg-[#171717] border border-outline-variant/30 rounded-lg pl-3 pr-8 cursor-pointer appearance-none hover:text-white hover:border-primary"
-                          value={followUpModel}
-                          onChange={(e) => setFollowUpModel(e.target.value)}
-                          disabled={isDeveloping}
-                        >
-                          <option value="llama-3.3-70b">Llama 3.3</option>
-                          <option value="qwen3-32b">Qwen 3</option>
-                          <option value="default">Default</option>
-                        </select>
-                        <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-[14px] text-on-surface-variant">
-                          keyboard_arrow_down
-                        </span>
-                      </div>
-                      {/* Agent Selector (Multi-select) */}
-                      <div ref={agentDropdownRef} className="relative shrink-0">
-                        <button
-                          className="h-9 flex items-center gap-2 px-3 text-on-surface-variant hover:text-white rounded-lg border border-outline-variant/30 hover:bg-[#262626] transition-colors cursor-pointer text-left bg-[#171717] max-w-37.5"
-                          type="button"
-                          onClick={() =>
-                            setIsAgentDropdownOpen(!isAgentDropdownOpen)
-                          }
-                          disabled={isDeveloping}
-                        >
-                          <div
-                            className="flex -space-x-1.5 pointer-events-none"
-                            aria-hidden="true"
-                          >
-                            {followUpSelectedAgents.map((agentId) => {
-                              const agent = downloadedAgents.find(
-                                (a) => a.id === agentId,
-                              );
-                              if (!agent) return null;
-                              return (
-                                <div
-                                  key={agent.id}
-                                  className="w-4 h-4 rounded bg-surface-container-highest flex items-center justify-center border border-background"
-                                >
-                                  <span className="material-symbols-outlined text-[10px]">
-                                    {agent.icon}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                          <span className="font-code-md text-[12px] truncate">
-                            {followUpSelectedAgents.length === 0
-                              ? "No Agents"
-                              : followUpSelectedAgents.length === 1
-                                ? downloadedAgents.find(
-                                    (a) => a.id === followUpSelectedAgents[0],
-                                  )?.name
-                                : "Agents"}
-                          </span>
-                          {followUpSelectedAgents.length > 2 && (
-                            <span className="text-[10px] bg-secondary-container/20 text-secondary px-1.5 rounded-full">
-                              +{followUpSelectedAgents.length - 2}
-                            </span>
-                          )}
-                          <span className="material-symbols-outlined text-[14px] shrink-0">
-                            keyboard_arrow_down
-                          </span>
-                        </button>
-
-                        {isAgentDropdownOpen && (
-                          <div className="absolute left-1/2 bottom-full mb-2 z-50 min-w-50 -translate-x-1/2 bg-[#171717] border border-outline-variant/30 rounded-lg p-2 shadow-xl flex flex-col gap-1">
-                            {downloadedAgents.length === 0 ? (
-                              <div className="px-3 py-2 text-[12px] text-on-surface-variant">
-                                Download agents from Marketplace first.
-                              </div>
-                            ) : (
-                              downloadedAgents.map((agent) => {
-                                const isSelected =
-                                  followUpSelectedAgents.includes(agent.id);
-                                return (
-                                  <div
-                                    key={agent.id}
-                                    className="flex items-center gap-2 px-3 py-2 hover:bg-[#262626] rounded-md cursor-pointer text-on-surface select-none text-[12px]"
-                                    onClick={() => {
-                                      if (isSelected) {
-                                        setFollowUpSelectedAgents(
-                                          followUpSelectedAgents.filter(
-                                            (id) => id !== agent.id,
-                                          ),
-                                        );
-                                      } else {
-                                        setFollowUpSelectedAgents([
-                                          ...followUpSelectedAgents,
-                                          agent.id,
-                                        ]);
-                                      }
-                                    }}
-                                  >
-                                    <span className="material-symbols-outlined text-[18px] text-primary">
-                                      {isSelected
-                                        ? "check_box"
-                                        : "check_box_outline_blank"}
-                                    </span>
-                                    <span className="material-symbols-outlined text-[16px]">
-                                      {agent.icon}
-                                    </span>
-                                    <span className="font-body-sm">
-                                      {agent.name}
-                                    </span>
-                                  </div>
-                                );
-                              })
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          createRipple(e);
-                          void handleSendFollowUp();
-                        }}
-                        className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all shrink-0 overflow-hidden ${
-                          followUpText.trim()
-                            ? "bg-primary text-on-primary hover:bg-opacity-90 active:scale-95 cursor-pointer"
-                            : "bg-[#353534] text-on-surface-variant opacity-50 cursor-not-allowed"
-                        }`}
-                        type="button"
-                        aria-label="Submit follow-up"
-                        disabled={!followUpText.trim() || isDeveloping}
-                      >
-                        <span className="material-symbols-outlined text-[20px]">
-                          {isDeveloping ? "progress_activity" : "arrow_upward"}
-                        </span>
-                      </button>
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>

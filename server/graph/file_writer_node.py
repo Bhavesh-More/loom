@@ -1,5 +1,5 @@
 from graph.state import LoomState
-from tools.file_tools import ensure_workspace, write_all_outputs
+from tools.file_tools import ensure_workspace, validate_written_files, write_all_outputs
 
 
 def file_writer_node(state: LoomState) -> LoomState:
@@ -37,6 +37,19 @@ def file_writer_node(state: LoomState) -> LoomState:
         return state
 
     results = write_all_outputs(agent_outputs, workspace_path)
+    validation_errors = []
+    for agent_name, paths in results.items():
+        validation_errors.extend(
+            validate_written_files(
+                paths,
+                agent_name=agent_name,
+                goal_or_task=state.get("goal", ""),
+            )
+        )
+    if validation_errors:
+        state["errors"].extend(validation_errors)
+        for error in validation_errors:
+            print(f"[FileWriter] Validation error: {error}")
 
     total_files = sum(len(paths) for paths in results.values())
     print(f"\n[FileWriter] Done. Written {total_files} file(s) across {len(results)} agent(s).")

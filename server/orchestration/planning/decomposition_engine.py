@@ -7,6 +7,7 @@ from typing import Any
 
 from langchain_groq import ChatGroq
 
+from graph.llm_utils import compact_text
 from orchestration.planning.agent_router import route_task
 from orchestration.planning.task_graph import TaskGraph, TaskNode
 
@@ -83,14 +84,15 @@ class DecompositionEngine:
             model="qwen/qwen3-32b",
             api_key=os.environ.get("GROQ_API_KEY_1"),
             temperature=0.2,
-            max_tokens=4096,
+            max_tokens=1536,
         )
+        context_json = compact_text(json.dumps(context, default=str), 3000)
 
         prompt = f"""
 You are a task decomposition assistant. Your job is to break down a high-level user request into a set of executable subtasks with explicit dependencies and required technical capabilities.
 
 User Request: {task}
-Context JSON: {json.dumps(context, default=str)}
+Context JSON: {context_json}
 
 Return a JSON object containing a list of subtasks. Each subtask must have the following structure:
 {{

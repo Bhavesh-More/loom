@@ -1,6 +1,7 @@
 import {
   type ChangeEvent,
   type Dispatch,
+  type KeyboardEvent,
   type SetStateAction,
   useEffect,
   useRef,
@@ -19,6 +20,9 @@ type PromptComposerProps = {
     selectedAgentIds: string[],
   ) => Promise<void> | void;
   isDevelopingProps?: boolean;
+  defaultSelectedAgentIds?: string[];
+  lockProjectSelection?: boolean;
+  placeholder?: string;
 };
 
 function PromptComposer({
@@ -26,6 +30,9 @@ function PromptComposer({
   setSelectedProjectId,
   onSendPrompt,
   isDevelopingProps,
+  defaultSelectedAgentIds,
+  lockProjectSelection = false,
+  placeholder = "How can i help you today?",
 }: PromptComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [prompt, setPrompt] = useState("");
@@ -153,7 +160,7 @@ function PromptComposer({
     }
   };
 
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       void handleSend();
@@ -189,7 +196,11 @@ function PromptComposer({
           const availableAgentIds = new Set(
             downloadedAgentData.map((agent) => agent.id),
           );
-          const filteredAgentIds = currentSelectedAgents.filter((agentId) =>
+          const preferredAgentIds =
+            defaultSelectedAgentIds && defaultSelectedAgentIds.length > 0
+              ? defaultSelectedAgentIds
+              : currentSelectedAgents;
+          const filteredAgentIds = preferredAgentIds.filter((agentId) =>
             availableAgentIds.has(agentId),
           );
 
@@ -221,7 +232,20 @@ function PromptComposer({
       window.removeEventListener("project-created", handleProjectCreated);
       window.removeEventListener("agents-changed", handleAgentsChanged);
     };
-  }, []);
+  }, [defaultSelectedAgentIds]);
+
+  useEffect(() => {
+    if (!defaultSelectedAgentIds || defaultSelectedAgentIds.length === 0) {
+      return;
+    }
+    const availableAgentIds = new Set(downloadedAgents.map((agent) => agent.id));
+    const nextSelectedAgents = defaultSelectedAgentIds.filter((agentId) =>
+      availableAgentIds.has(agentId),
+    );
+    if (nextSelectedAgents.length > 0) {
+      setSelectedAgents(nextSelectedAgents);
+    }
+  }, [defaultSelectedAgentIds, downloadedAgents]);
 
   return (
     <section className="w-full relative" aria-label="Project prompt composer">
@@ -283,7 +307,7 @@ function PromptComposer({
           className={`bg-surface-container-low border border-outline-variant rounded-3xl flex flex-col shadow-2xl relative z-10 transition-colors duration-300 ${isRippling ? "siri-active" : ""}`}
         >
           {/* Project Name Input */}
-          {selectedProjectId === "new-project" && (
+          {selectedProjectId === "new-project" && !lockProjectSelection && (
             <div className="px-6 pt-5 pb-2 border-b border-outline-variant/30 flex items-center gap-2">
               <span className="material-symbols-outlined text-[18px] text-on-surface-variant">
                 create_new_folder
@@ -305,7 +329,7 @@ function PromptComposer({
               className="w-full bg-transparent border-none outline-none focus:ring-0 focus:border-transparent focus:outline-none font-body-lg text-body-lg text-on-surface resize-none placeholder:text-outline/60 p-0 m-0"
               onChange={handleChange}
               onKeyDown={handleKeyDown}
-              placeholder="How can i help you today?"
+              placeholder={placeholder}
               ref={textareaRef}
               rows={2}
               value={prompt}
@@ -320,11 +344,18 @@ function PromptComposer({
               <button
                 type="button"
                 onClick={() => {
+                  if (lockProjectSelection) {
+                    return;
+                  }
                   setLocalSelectedProjectId(selectedProjectId);
                   setIsProjectModalOpen(true);
                 }}
-                disabled={isDeveloping}
-                className="flex items-center gap-1.5 px-3 py-1 text-on-surface-variant hover:text-white rounded-full border border-outline-variant/30 hover:bg-surface-variant/30 transition-colors max-w-55 text-left cursor-pointer select-none"
+                disabled={isDeveloping || lockProjectSelection}
+                className={`flex items-center gap-1.5 px-3 py-1 text-on-surface-variant rounded-full border border-outline-variant/30 transition-colors max-w-55 text-left select-none ${
+                  isDeveloping || lockProjectSelection
+                    ? "opacity-80 cursor-default"
+                    : "hover:text-white hover:bg-surface-variant/30 cursor-pointer"
+                }`}
               >
                 <span className="material-symbols-outlined text-[16px] pointer-events-none">
                   folder
