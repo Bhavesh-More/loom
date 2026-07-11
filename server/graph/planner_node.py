@@ -5,6 +5,7 @@ import os
 from langchain_groq import ChatGroq
 
 from graph.state import LoomState
+from graph.llm_utils import compact_text
 from observability.execution_logger import log_execution_event
 from orchestration.planning.decomposition_engine import DecompositionEngine
 from prompts.prompts import PLANNER_SYSTEM_PROMPT
@@ -50,7 +51,7 @@ async def planner_node(state: LoomState) -> LoomState:
         model="qwen/qwen3-32b",
         api_key=os.environ.get("GROQ_API_KEY_1"),
         temperature=0.6,
-        max_tokens=4096,
+        max_tokens=1536,
     )
 
     tier_context = {
@@ -80,13 +81,16 @@ async def planner_node(state: LoomState) -> LoomState:
     except Exception as he:
         print(f"[Planner] Failed to retrieve history for planner context: {he}")
 
+    context_payload_text = compact_text(state.get('context_payload_text', ''), 5000)
+    history_block = compact_text(history_block, 2500)
+
     user_message = f"""
 Project Goal: {state['goal']}
 
 Agents to plan for (ONLY these, do not add others): {json.dumps(agents_to_plan)}
 
 Precomputed repository context payload:
-{state.get('context_payload_text', '')}
+{context_payload_text}
 {history_block}
 
 Use this context to choose agents and task order. Do not ask downstream agents

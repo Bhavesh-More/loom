@@ -2,6 +2,7 @@ import os
 import json
 import re
 from langchain_groq import ChatGroq
+from graph.llm_utils import compact_text
 from graph.state import LoomState
 from db.database import database
 from knowledge.memory_service import memory_service
@@ -82,13 +83,16 @@ async def qa_node(state: LoomState) -> LoomState:
         max_tokens=2048,
     )
 
+    context_payload_text = compact_text(state.get('context_payload_text', ''), 7000)
+    memories_block = compact_text(memories_block, 3000)
+
     user_message = f"""
 Project Goal: {state['goal']}
 
 Team Agents: {', '.join(state.get('selected_agents', []))}
 
 Precomputed repository context:
-{state.get('context_payload_text', '')}
+{context_payload_text}
 {memories_block}
 
 User Question: {state['goal']}
@@ -141,4 +145,3 @@ User Question: {state['goal']}
         state["qa_response"] = "Sorry, I could not answer your question right now."
 
     return state
-

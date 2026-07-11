@@ -9,6 +9,7 @@ from typing import Any
 from langchain_groq import ChatGroq
 
 from db.database import database
+from graph.llm_utils import compact_text
 from observability.execution_logger import log_execution_event
 from prompts.prompts import AGENT_PROMPT_MAP
 from orchestration.planning.plan_schema import (
@@ -84,7 +85,7 @@ class MasterPlanner:
             model="qwen/qwen3-32b",
             api_key=os.environ.get("GROQ_API_KEY_1"),
             temperature=0.2,
-            max_tokens=4096,
+            max_tokens=1536,
         )
         prompt = self._planner_prompt(task, context, run_id)
         messages = [
@@ -103,12 +104,13 @@ class MasterPlanner:
             return self._calculator_plan_json(task, context, run_id)
 
     def _planner_prompt(self, task: str, context: dict[str, Any], run_id: str) -> str:
+        context_json = compact_text(json.dumps(context, default=str), 4000)
         return f"""
 Build a complete JSON ExecutionPlan for this multi-agent task.
 
 Task: {task}
 Run ID: {run_id}
-Context JSON: {json.dumps(context, default=str)}
+Context JSON: {context_json}
 
 Schema:
 {{
