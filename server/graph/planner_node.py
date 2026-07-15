@@ -2,9 +2,8 @@ import asyncio
 import json
 import os
 
-from langchain_groq import ChatGroq
-
 from graph.state import LoomState
+from graph.llm_clients import get_groq_planner_llm
 from graph.llm_utils import compact_text
 from observability.execution_logger import log_execution_event
 from orchestration.planning.decomposition_engine import DecompositionEngine
@@ -31,28 +30,30 @@ TIER_MAP = {
 
 async def planner_node(state: LoomState) -> LoomState:
     """
-    Calls Qwen3-32b (thinking enabled) to produce an ordered execution plan.
-    Plans ONLY for state['active_agents'] — the subset the router decided is needed
-    for this specific query. This prevents running mongodb/fastapi when the user
-    only asked to generate the frontend.
+    Calls Groq (qwen3-32b) to produce a full architecture blueprint and an
+    ordered execution plan.
+
+    Plans ONLY for state['active_agents'] — the subset the router decided is
+    needed for this specific query. This prevents running mongodb/fastapi when
+    the user only asked to generate the frontend.
+
+    The plan now includes per-step fields:
+      - architecture_notes : design decisions and integration points
+      - coding_rules       : concrete rules the executor agent must follow
+      - avoid              : anti-patterns the executor agent must skip
+      - expected_output    : list of files and what each should contain
 
     After the LLM plan is built, the DecompositionEngine runs to produce a
-    hierarchical TaskGraph which is stored in state['task_graph'] along with
-    per-node agent selection reasoning in state['task_graph_logs'].
+    hierarchical TaskGraph stored in state['task_graph'] with per-node agent
+    selection reasoning in state['task_graph_logs'].
     """
-    print("\n[Planner] Generating execution plan...")
+    print("\n[Planner] Generating architecture blueprint and execution plan...")
 
     # KEY FIX: use active_agents (what the router decided), not selected_agents (the full team)
     agents_to_plan = state.get("active_agents") or state["selected_agents"]
-
     print(f"[Planner] Planning for agents: {agents_to_plan}")
 
-    llm = ChatGroq(
-        model="qwen/qwen3-32b",
-        api_key=os.environ.get("GROQ_API_KEY_1"),
-        temperature=0.6,
-        max_tokens=1536,
-    )
+    llm = get_groq_planner_llm()
 
     tier_context = {
         agent: TIER_MAP.get(agent, 99)
@@ -67,12 +68,11 @@ async def planner_node(state: LoomState) -> LoomState:
         for agent in agents_to_plan:
             resolved_aid = await memory_service.resolve_agent_id(agent)
             if resolved_aid:
-                # Fetch recent memories for the agent
                 memories = await memory_service.get_memories(agent_id=resolved_aid)
                 for m in memories[:3]:
-                    history_items.append(f"- Agent '{agent}' prior learning (Context: {m.context}): {m.learned_info}")
-                
-                # Fetch successful executions
+                    history_items.append(
+                        f"- Agent '{agent}' prior learning (Context: {m.context}): {m.learned_info}"
+                    )
                 executions = await memory_service.get_executions(agent_id=resolved_aid, status="success")
                 for e in executions[:2]:
                     history_items.append(f"- Agent '{agent}' past successful task: '{e.task_id}'")
@@ -81,8 +81,17 @@ async def planner_node(state: LoomState) -> LoomState:
     except Exception as he:
         print(f"[Planner] Failed to retrieve history for planner context: {he}")
 
+    # Inject theme context so planner can reference it in architecture_notes and coding_rules
+    theme = state.get("theme")
+    theme_block = ""
+    if theme:
+        theme_block = (
+            "\n\n## Selected UI Theme (pass relevant tokens into executor coding_rules):\n"
+            + json.dumps(theme, indent=2)
+        )
+
     context_payload_text = compact_text(state.get('context_payload_text', ''), 5000)
-    history_block = compact_text(history_block, 2500)
+    history_block        = compact_text(history_block, 2500)
 
     user_message = f"""
 Project Goal: {state['goal']}
@@ -92,6 +101,7 @@ Agents to plan for (ONLY these, do not add others): {json.dumps(agents_to_plan)}
 Precomputed repository context payload:
 {context_payload_text}
 {history_block}
+{theme_block}
 
 Use this context to choose agents and task order. Do not ask downstream agents
 to rediscover the repository from scratch when the needed files are already
@@ -100,7 +110,8 @@ listed in the context payload.
 Tier Map for these agents:
 {json.dumps(tier_context, indent=2)}
 
-Produce the execution plan now.
+Produce the architecture blueprint and execution plan now.
+Return ONLY the JSON — no markdown, no explanation, no preamble.
 """
 
     messages = [
@@ -111,10 +122,11 @@ Produce the execution plan now.
     log_execution_event(
         "planner.input",
         {
-            "project_id": state.get("project_id"),
+            "project_id":     state.get("project_id"),
             "chat_session_id": state.get("chat_session_id"),
-            "agents": agents_to_plan,
-            "messages": messages,
+            "agents":          agents_to_plan,
+            "theme":           theme,
+            "messages":        messages,
         },
     )
 
@@ -133,58 +145,66 @@ Produce the execution plan now.
             raw = raw[4:]
     raw = raw.strip().rstrip("```").strip()
 
+    plan = []
+    architecture_blueprint = {}
     try:
         parsed = json.loads(raw)
         plan = parsed.get("plan", [])
+        # Store the whole parsed response as the architecture blueprint
+        architecture_blueprint = parsed
     except json.JSONDecodeError as e:
         print(f"[Planner] Failed to parse plan JSON: {e}")
         print(f"[Planner] Raw output was:\n{raw}")
-        plan = []
         state["errors"].append(f"Planner JSON parse error: {str(e)}")
 
+    print(f"[Planner] Architecture overview: {architecture_blueprint.get('architecture_overview', 'N/A')}")
     print(f"[Planner] Plan generated with {len(plan)} steps:")
     for step in plan:
-        print(f"  Step {step.get('step')}: {step.get('agent')} — {step.get('task')[:80]}...")
+        agent = step.get('agent', '?')
+        task  = step.get('task', '')[:80]
+        rules = step.get('coding_rules', [])
+        avoid = step.get('avoid', [])
+        print(f"  Step {step.get('step')}: {agent} — {task}...")
+        print(f"    Rules: {len(rules)} | Avoid: {len(avoid)}")
 
-    state["execution_plan"] = plan
-    state["current_step"]   = 0
+    state["execution_plan"]       = plan
+    state["current_step"]         = 0
+    state["architecture_blueprint"] = architecture_blueprint
 
     # --- Task Graph Decomposition ---
-    # Run the DecompositionEngine to build a structured TaskGraph, then store
-    # it and per-node agent selection reasoning logs into state.
     try:
         engine = DecompositionEngine()
         context = {
-            "project_id": state.get("project_id"),
-            "available_agents": agents_to_plan,
-            "selected_agents": state.get("selected_agents", []),
+            "project_id":        state.get("project_id"),
+            "available_agents":  agents_to_plan,
+            "selected_agents":   state.get("selected_agents", []),
         }
         task_graph = await engine.decompose(state["goal"], context)
         task_graph_logs = [
             f"[{node.id}] agent={node.agent_id} score={node.capability_score:.2f} | {node.selection_reasoning}"
             for node in task_graph.nodes
         ]
-        state["task_graph"] = task_graph.model_dump()
+        state["task_graph"]      = task_graph.model_dump()
         state["task_graph_logs"] = task_graph_logs
         log_execution_event(
             "planner.task_graph_built",
             {
-                "project_id": state.get("project_id"),
+                "project_id":      state.get("project_id"),
                 "chat_session_id": state.get("chat_session_id"),
-                "node_count": len(task_graph.nodes),
-                "logs": task_graph_logs,
+                "node_count":      len(task_graph.nodes),
+                "logs":            task_graph_logs,
             },
         )
         print(f"[Planner] Task graph built with {len(task_graph.nodes)} nodes.")
     except Exception as exc:
-        state["task_graph"] = None
+        state["task_graph"]      = None
         state["task_graph_logs"] = []
         log_execution_event(
             "planner.task_graph_skipped",
             {
-                "project_id": state.get("project_id"),
+                "project_id":      state.get("project_id"),
                 "chat_session_id": state.get("chat_session_id"),
-                "error": str(exc),
+                "error":           str(exc),
             },
         )
         print(f"[Planner] Task graph skipped: {exc}")
@@ -192,11 +212,12 @@ Produce the execution plan now.
     log_execution_event(
         "planner.output",
         {
-            "project_id": state.get("project_id"),
-            "chat_session_id": state.get("chat_session_id"),
-            "plan_json": plan,
-            "raw_output": raw,
-            "errors": state.get("errors", []),
+            "project_id":            state.get("project_id"),
+            "chat_session_id":       state.get("chat_session_id"),
+            "plan_json":             plan,
+            "architecture_blueprint": architecture_blueprint,
+            "raw_output":            raw,
+            "errors":                state.get("errors", []),
         },
     )
     return state

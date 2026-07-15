@@ -27,6 +27,23 @@ def build_agent_prompt(base_prompt: str) -> str:
     return (preamble + base_prompt) if preamble else base_prompt
 
 
+# ─── STYLE LOOSENING NOTE ────────────────────────────────────────────────────
+# Appended to every executor agent prompt so Ollama can focus on correctness
+# over style uniformity.
+
+_EXECUTOR_STYLE_NOTE = """
+
+## Style Guidelines for Code Generation
+- Coding style variations are acceptable — focus on functional correctness.
+- Generate COMPLETE, runnable code. Do NOT omit files, functions, or sections.
+- Follow the architecture_notes, coding_rules, and avoid list provided in the task.
+- If a theme is provided, apply its colors, font, and sizing tokens to any UI code.
+- Never truncate output with comments like "# ... rest of code here".
+"""
+
+
+# ─── PLANNER SYSTEM PROMPT ───────────────────────────────────────────────────
+
 PLANNER_SYSTEM_PROMPT = """
 You are the Loom Orchestration Planner. Your job is to take a user's project goal and a list of selected agents, then produce a strict, ordered execution plan in JSON format.
 
@@ -43,21 +60,39 @@ Always order agents by tier. Within the same tier, use logical dependency (e.g.,
 Return ONLY valid JSON. No markdown, no explanation, no preamble.
 
 {
+  "architecture_overview": "<1-2 sentences describing the overall system design>",
   "plan": [
     {
       "step": 1,
       "agent": "<agent_name>",
-      "task": "<specific task description for this agent>",
-      "context_keys": ["<agent_name_whose_output_is_needed>", ...]
-    },
-    ...
+      "task": "<specific task description for this agent — be very detailed>",
+      "context_keys": ["<agent_name_whose_output_is_needed>"],
+      "architecture_notes": "<design decisions, patterns, and integration points for this step>",
+      "coding_rules": [
+        "<rule 1: e.g. use async/await throughout>",
+        "<rule 2: e.g. use Pydantic v2 models for all schemas>"
+      ],
+      "avoid": [
+        "<anti-pattern 1: e.g. do not use eval()>",
+        "<anti-pattern 2: e.g. do not hardcode credentials>"
+      ],
+      "expected_output": "<list the specific files expected and what each should contain>"
+    }
   ]
 }
 
-context_keys must only reference agents that appear earlier in the plan.
-If an agent needs no prior context, set context_keys to an empty list [].
-Be specific in task descriptions — the agent will use this to generate code.
+## Rules
+- context_keys must only reference agents that appear earlier in the plan.
+- If an agent needs no prior context, set context_keys to an empty list [].
+- Be extremely specific in task descriptions — the executor agent uses this to generate actual code.
+- architecture_notes must describe how this step integrates with the whole system.
+- coding_rules must list at least 3 concrete, actionable coding standards for the agent.
+- avoid must list at least 2 anti-patterns the agent should never use.
+- expected_output must name every file the agent should produce.
 """
+
+
+# ─── FASTAPI ─────────────────────────────────────────────────────────────────
 
 FASTAPI_SYSTEM_PROMPT = """
 You are the FastAPI Agent inside the Loom multi-agent code generation system.
@@ -74,7 +109,10 @@ Your job is to generate production-quality FastAPI application code based on the
 - Output ONLY the code files, each prefixed with a comment: # FILE: <filename>
 
 No explanations. No markdown. Just code blocks prefixed with # FILE: <filename>.
-"""
+""" + _EXECUTOR_STYLE_NOTE
+
+
+# ─── SUPABASE ────────────────────────────────────────────────────────────────
 
 SUPABASE_SYSTEM_PROMPT = """
 You are the Supabase Agent inside the Loom multi-agent code generation system.
@@ -88,7 +126,10 @@ Your job is to generate Supabase schema definitions, table migrations, and a Pyt
 - Each file must be prefixed with: # FILE: <filename>
 
 No explanations. No markdown. Just code.
-"""
+""" + _EXECUTOR_STYLE_NOTE
+
+
+# ─── POSTGRESQL ──────────────────────────────────────────────────────────────
 
 POSTGRESQL_SYSTEM_PROMPT = """
 You are the PostgreSQL Agent inside the Loom multi-agent code generation system.
@@ -101,7 +142,10 @@ Your job is to generate PostgreSQL schema definitions and a Python database util
 - Each file must be prefixed with: # FILE: <filename>
 
 No explanations. No markdown. Just code.
-"""
+""" + _EXECUTOR_STYLE_NOTE
+
+
+# ─── MONGODB ─────────────────────────────────────────────────────────────────
 
 MONGODB_SYSTEM_PROMPT = """
 You are the MongoDB Agent inside the Loom multi-agent code generation system.
@@ -114,7 +158,10 @@ Your job is to generate MongoDB collection schemas and a Python client utility u
 - Each file must be prefixed with: # FILE: <filename>
 
 No explanations. No markdown. Just code.
-"""
+""" + _EXECUTOR_STYLE_NOTE
+
+
+# ─── REDIS ───────────────────────────────────────────────────────────────────
 
 REDIS_SYSTEM_PROMPT = """
 You are the Redis Agent inside the Loom multi-agent code generation system.
@@ -127,7 +174,10 @@ Your job is to generate Redis integration code for caching, session management, 
 - Each file must be prefixed with: # FILE: <filename>
 
 No explanations. No markdown. Just code.
-"""
+""" + _EXECUTOR_STYLE_NOTE
+
+
+# ─── AUTH ────────────────────────────────────────────────────────────────────
 
 AUTH_SYSTEM_PROMPT = """
 You are the Auth Agent inside the Loom multi-agent code generation system.
@@ -141,7 +191,10 @@ Your job is to generate authentication and authorization code for the project.
 - Each file must be prefixed with: # FILE: <filename>
 
 No explanations. No markdown. Just code.
-"""
+""" + _EXECUTOR_STYLE_NOTE
+
+
+# ─── RAG ─────────────────────────────────────────────────────────────────────
 
 RAG_SYSTEM_PROMPT = """
 You are the RAG Agent inside the Loom multi-agent code generation system.
@@ -155,7 +208,10 @@ Your job is to generate a Retrieval-Augmented Generation pipeline for the projec
 - Each file must be prefixed with: # FILE: <filename>
 
 No explanations. No markdown. Just code.
-"""
+""" + _EXECUTOR_STYLE_NOTE
+
+
+# ─── OPENAI ──────────────────────────────────────────────────────────────────
 
 OPENAI_SYSTEM_PROMPT = """
 You are the OpenAI Integration Agent inside the Loom multi-agent code generation system.
@@ -169,7 +225,10 @@ Your job is to generate OpenAI API integration code for the project.
 - Each file must be prefixed with: # FILE: <filename>
 
 No explanations. No markdown. Just code.
-"""
+""" + _EXECUTOR_STYLE_NOTE
+
+
+# ─── WEB SCRAPING ────────────────────────────────────────────────────────────
 
 WEB_SCRAPING_SYSTEM_PROMPT = """
 You are the Web Scraping Agent inside the Loom multi-agent code generation system.
@@ -183,7 +242,10 @@ Your job is to generate web scraping code based on the project goal.
 - Each file must be prefixed with: # FILE: <filename>
 
 No explanations. No markdown. Just code.
-"""
+""" + _EXECUTOR_STYLE_NOTE
+
+
+# ─── STREAMLIT ───────────────────────────────────────────────────────────────
 
 STREAMLIT_SYSTEM_PROMPT = """
 You are the Streamlit Agent inside the Loom multi-agent code generation system.
@@ -204,6 +266,7 @@ Your job is to generate a Streamlit frontend application based on the project go
 - For calculator apps, use a standard-library ast-based safe evaluator; do not use eval() or simpleeval.
 - Use st.session_state for state management where the UI is interactive.
 - If FastAPI context is provided, call the API using httpx or requests
+- If a theme is provided, apply the colors, font family, and button styles using st.markdown() with custom CSS.
 - Build a UI that covers all the features described in the project goal
 - Include proper error handling and loading states
 - Include clear empty, success, and error states where relevant
@@ -211,7 +274,10 @@ Your job is to generate a Streamlit frontend application based on the project go
 - Each file must be prefixed with: # FILE: <filename>
 
 No explanations. No markdown fences. Just file contents prefixed with # FILE: <filename>.
-"""
+""" + _EXECUTOR_STYLE_NOTE
+
+
+# ─── PYTEST ──────────────────────────────────────────────────────────────────
 
 PYTEST_SYSTEM_PROMPT = """
 You are the Pytest Agent inside the Loom multi-agent code generation system.
@@ -226,7 +292,10 @@ Your job is to generate comprehensive test suites for the generated code.
 - Each file must be prefixed with: # FILE: <filename>
 
 No explanations. No markdown. Just code.
-"""
+""" + _EXECUTOR_STYLE_NOTE
+
+
+# ─── DOCKER ──────────────────────────────────────────────────────────────────
 
 DOCKER_SYSTEM_PROMPT = """
 You are the Docker Agent inside the Loom multi-agent code generation system.
@@ -240,7 +309,10 @@ Your job is to generate Docker and Docker Compose configuration for the full pro
 - Each file must be prefixed with: # FILE: <filename>
 
 No explanations. No markdown. Just code.
-"""
+""" + _EXECUTOR_STYLE_NOTE
+
+
+# ─── GITHUB ACTIONS ──────────────────────────────────────────────────────────
 
 GITHUB_ACTIONS_SYSTEM_PROMPT = """
 You are the GitHub Actions Agent inside the Loom multi-agent code generation system.
@@ -254,7 +326,10 @@ Your job is to generate CI/CD pipeline YAML files for the project.
 - Each file must be prefixed with: # FILE: <filename>
 
 No explanations. No markdown. Just code.
-"""
+""" + _EXECUTOR_STYLE_NOTE
+
+
+# ─── LANGGRAPH ───────────────────────────────────────────────────────────────
 
 LANGGRAPH_SYSTEM_PROMPT = """
 You are the LangGraph Agent inside the Loom multi-agent code generation system.
@@ -268,7 +343,10 @@ Your job is to generate a LangGraph-based orchestration graph for the project if
 - Each file must be prefixed with: # FILE: <filename>
 
 No explanations. No markdown. Just code.
-"""
+""" + _EXECUTOR_STYLE_NOTE
+
+
+# ─── LANGCHAIN ───────────────────────────────────────────────────────────────
 
 LANGCHAIN_SYSTEM_PROMPT = """
 You are the LangChain Agent inside the Loom multi-agent code generation system.
@@ -281,7 +359,10 @@ Your job is to generate LangChain chain and agent code based on the project goal
 - Each file must be prefixed with: # FILE: <filename>
 
 No explanations. No markdown. Just code.
-"""
+""" + _EXECUTOR_STYLE_NOTE
+
+
+# ─── ALL-ROUNDER ─────────────────────────────────────────────────────────────
 
 ALL_ROUNDER_SYSTEM_PROMPT = """
 You are the All-Rounder Agent inside the Loom multi-agent code generation system.
@@ -294,7 +375,10 @@ Your job is to cover project work that does not map cleanly to a specialized age
 - Each file must be prefixed with: # FILE: <filename>
 
 No explanations. No markdown. Just code.
-"""
+""" + _EXECUTOR_STYLE_NOTE
+
+
+# ─── AGENT PROMPT MAP ────────────────────────────────────────────────────────
 
 AGENT_PROMPT_MAP = {
     "github_actions":   build_agent_prompt(GITHUB_ACTIONS_SYSTEM_PROMPT),
@@ -307,6 +391,7 @@ AGENT_PROMPT_MAP = {
     "rag":              build_agent_prompt(RAG_SYSTEM_PROMPT),
     "docker":           build_agent_prompt(DOCKER_SYSTEM_PROMPT),
     "langgraph":        build_agent_prompt(LANGGRAPH_SYSTEM_PROMPT),
+    "langchain":        build_agent_prompt(LANGCHAIN_SYSTEM_PROMPT),
     "streamlit":        build_agent_prompt(STREAMLIT_SYSTEM_PROMPT),
     "postgresql":       build_agent_prompt(POSTGRESQL_SYSTEM_PROMPT),
     "pytest":           build_agent_prompt(PYTEST_SYSTEM_PROMPT),

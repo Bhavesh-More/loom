@@ -77,6 +77,10 @@ class DevelopProjectRequest(BaseModel):
     prompt: str
     selected_agent_ids: list[UUID] = []
     chat_session_id: UUID | None = None
+    # Optional UI theme. Pass a dict of design tokens, e.g.:
+    # {"primary_color": "#6366f1", "background": "#0f172a",
+    #  "button_radius": "8px", "font": "Inter"}
+    theme: dict | None = None
 
 chat_repository = ChatRepository(database)
 
@@ -155,23 +159,26 @@ async def develop_project(request: DevelopProjectRequest):
 
             # 4. Invoke the orchestrator using those agents
             initial_state = {
-                "project_id": str(request.project_id),
-                "project_name": project["name"],
-                "goal": request.prompt,
-                "selected_agents": selected_agents,
-                "active_agents": [],
-                "query_type": "",
-                "qa_response": "",
-                "execution_plan": [],
-                "current_step": 0,
-                "agent_outputs": {},
-                "workspace_path": str(workspace_service.get_workspace_path(project["name"])),
-                "errors": [],
-                "context_payload": {},
-                "context_payload_text": "",
-                "chat_session_id": str(chat_session_id),
-                "task_graph": None,
-                "task_graph_logs": [],
+                "project_id":             str(request.project_id),
+                "project_name":           project["name"],
+                "goal":                   request.prompt,
+                "selected_agents":        selected_agents,
+                "active_agents":          [],
+                "query_type":             "",
+                "qa_response":            "",
+                "execution_plan":         [],
+                "current_step":           0,
+                "agent_outputs":          {},
+                "workspace_path":         str(workspace_service.get_workspace_path(project["name"])),
+                "errors":                 [],
+                "context_payload":        {},
+                "context_payload_text":   "",
+                "chat_session_id":        str(chat_session_id),
+                "task_graph":             None,
+                "task_graph_logs":        [],
+                # Theme is optional — None when the user didn't select one
+                "theme":                  request.theme,
+                "architecture_blueprint": None,
             }
 
             yield json.dumps({
