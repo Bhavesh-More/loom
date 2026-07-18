@@ -87,7 +87,7 @@ def get_groq_qa_llm() -> ChatGroq:
 
 # ─── Ollama Cloud LLM factory ────────────────────────────────────────────────
 
-def get_ollama_executor_llm() -> ChatOpenAI:
+def get_ollama_executor_llm():
     """
     Ollama Cloud LLM used by the Executor node for actual code generation.
 
@@ -95,20 +95,51 @@ def get_ollama_executor_llm() -> ChatOpenAI:
     langchain-openai's ChatOpenAI with a custom base_url.
 
     Configure via environment variables:
-      OLLAMA_API_KEY  — your Ollama Cloud API key
+      OLLAMA_API_KEY, OLLAMA_API_KEY_1, OLLAMA_API_KEY_2, etc.
       OLLAMA_BASE_URL — endpoint (default: https://api.ollama.com/v1)
       OLLAMA_MODEL    — model name (default: devstral)
+      
+    If multiple OLLAMA_API_KEY_* variables are provided, they are chained together 
+    using LangChain's fallback mechanism to gracefully handle rate limit errors.
     """
-    api_key = os.environ.get("OLLAMA_API_KEY")
-    if not api_key:
+    api_keys = []
+    
+    # Check for the default OLLAMA_API_KEY
+    default_key = os.environ.get("OLLAMA_API_KEY")
+    if default_key:
+        api_keys.append(default_key)
+        
+    # Check for OLLAMA_API_KEY_1, OLLAMA_API_KEY_2, etc.
+    # Sort them to ensure deterministic order (e.g., _1, _2, _3)
+    numbered_keys = [k for k in os.environ.keys() if k.startswith("OLLAMA_API_KEY_")]
+    numbered_keys.sort()
+    
+    for k in numbered_keys:
+        api_keys.append(os.environ[k])
+        
+    if not api_keys:
         raise EnvironmentError(
             "OLLAMA_API_KEY is not set. The Executor node requires Ollama Cloud. "
-            "Add OLLAMA_API_KEY to your .env file."
+            "Add OLLAMA_API_KEY (or OLLAMA_API_KEY_1, etc.) to your .env file."
         )
-    return ChatOpenAI(
-        model=_OLLAMA_MODEL,
-        openai_api_key=api_key,
-        openai_api_base=_OLLAMA_BASE_URL,
-        temperature=0.2,
-        max_tokens=8192,
-    )
+
+    # Create ChatOpenAI instances for each key
+    llms = [
+        ChatOpenAI(
+            model=_OLLAMA_MODEL,
+            openai_api_key=key,
+            openai_api_base=_OLLAMA_BASE_URL,
+            temperature=0.2,
+            max_tokens=8192,
+        )
+        for key in api_keys
+    ]
+
+    # The first LLM is the primary
+    primary_llm = llms[0]
+    
+    # If there are fallbacks, chain them
+    if len(llms) > 1:
+        return primary_llm.with_fallbacks(llms[1:])
+        
+    return primary_llm

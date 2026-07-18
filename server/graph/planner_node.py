@@ -8,6 +8,7 @@ from graph.llm_utils import compact_text
 from observability.execution_logger import log_execution_event
 from orchestration.planning.decomposition_engine import DecompositionEngine
 from prompts.prompts import PLANNER_SYSTEM_PROMPT
+from sandbox.manifest import load_manifest
 
 TIER_MAP = {
     "postgresql":     1,
@@ -90,6 +91,17 @@ async def planner_node(state: LoomState) -> LoomState:
             + json.dumps(theme, indent=2)
         )
 
+    project_id = state.get("project_id", "default")
+    try:
+        manifest_data = load_manifest(project_id)
+    except Exception as e:
+        manifest_data = {"files": {}, "conventions": []}
+    
+    manifest_block = (
+        "\n\n## Current Project Files & Responsibilities:\n"
+        + json.dumps(manifest_data, indent=2)
+    )
+
     context_payload_text = compact_text(state.get('context_payload_text', ''), 5000)
     history_block        = compact_text(history_block, 2500)
 
@@ -102,6 +114,7 @@ Precomputed repository context payload:
 {context_payload_text}
 {history_block}
 {theme_block}
+{manifest_block}
 
 Use this context to choose agents and task order. Do not ask downstream agents
 to rediscover the repository from scratch when the needed files are already

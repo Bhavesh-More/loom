@@ -9,6 +9,7 @@ from api.routes.orchestration_route import router as orchestration_router
 from api.routes.shared_knowledge_route import router as shared_knowledge_router
 from api.routes.agent_memory_route import router as agent_memory_router
 from api.routes.audit_route import router as audit_router
+from api.routes.theme_route import router as theme_router
 
 router = APIRouter()
 
@@ -21,3 +22,4 @@ router.include_router(orchestration_router)
 router.include_router(shared_knowledge_router)
 router.include_router(agent_memory_router)
 router.include_router(audit_router)
+router.include_router(theme_router)

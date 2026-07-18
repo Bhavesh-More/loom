@@ -10,6 +10,7 @@ import {
 import { createPortal } from "react-dom";
 import { getProjects, developProject, type Project } from "../lib/projects";
 import { getDownloadedAgents, type AgentData } from "../lib/agents";
+import { getThemes, type ThemeMetadata } from "../lib/themes";
 
 type PromptComposerProps = {
   selectedProjectId: string;
@@ -18,6 +19,7 @@ type PromptComposerProps = {
     projectId: string,
     prompt: string,
     selectedAgentIds: string[],
+    themeId?: string | null,
   ) => Promise<void> | void;
   isDevelopingProps?: boolean;
   defaultSelectedAgentIds?: string[];
@@ -54,6 +56,23 @@ function PromptComposer({
   const [localSelectedProjectId, setLocalSelectedProjectId] = useState("");
   const [localSelectedAgents, setLocalSelectedAgents] = useState<string[]>([]);
   const [isRippling, setIsRippling] = useState(false);
+
+  // ── Theme Selector state ──────────────────────────────────────────────────
+  const [themes, setThemes] = useState<ThemeMetadata[]>([]);
+  const [selectedThemeId, setSelectedThemeId] = useState<string | null>(null);
+  const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
+  const [localSelectedThemeId, setLocalSelectedThemeId] = useState<
+    string | null
+  >(null);
+  const [isLoadingThemes, setIsLoadingThemes] = useState(false);
+
+  // Detect whether the Streamlit agent is among the selected agents.
+  // We match by name (case-insensitive) to avoid hardcoding an agent ID.
+  const isStreamlitSelected = downloadedAgents.some(
+    (a) =>
+      selectedAgents.includes(a.id) &&
+      a.name.toLowerCase().includes("streamlit"),
+  );
 
   const handleChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
     setPrompt(event.target.value);
@@ -123,8 +142,16 @@ function PromptComposer({
       }
     }
 
+    // Only pass themeId when the Streamlit agent is selected
+    const themeIdToSend = isStreamlitSelected ? selectedThemeId : null;
+
     if (onSendPrompt) {
-      void onSendPrompt(projectIdToDevelop, prompt.trim(), selectedAgents);
+      void onSendPrompt(
+        projectIdToDevelop,
+        prompt.trim(),
+        selectedAgents,
+        themeIdToSend,
+      );
       setPrompt("");
       if (textareaRef.current) {
         textareaRef.current.style.height = "auto";
@@ -141,6 +168,8 @@ function PromptComposer({
         projectIdToDevelop,
         prompt.trim(),
         selectedAgents,
+        null,
+        themeIdToSend,
       );
       let successMsg = `Successfully developed project! Files written to: ${result.workspace_path}`;
       if (result.errors && result.errors.length > 0) {
@@ -247,6 +276,33 @@ function PromptComposer({
     }
   }, [defaultSelectedAgentIds, downloadedAgents]);
 
+  // ── Fetch themes when Streamlit agent becomes selected ────────────────────
+  useEffect(() => {
+    if (!isStreamlitSelected) {
+      // Clear theme selection when Streamlit is deselected
+      setSelectedThemeId(null);
+      setThemes([]);
+      return;
+    }
+
+    let active = true;
+    setIsLoadingThemes(true);
+
+    getThemes().then((data) => {
+      if (active) {
+        setThemes(data);
+        setIsLoadingThemes(false);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [isStreamlitSelected]);
+
+  // ── Derived values ────────────────────────────────────────────────────────
+  const selectedTheme = themes.find((t) => t.id === selectedThemeId) ?? null;
+
   return (
     <section className="w-full relative" aria-label="Project prompt composer">
       {/* Siri style tag for keyframe animations */}
@@ -298,6 +354,14 @@ function PromptComposer({
           background-color: #171717 !important;
           color: #e5e2e1 !important;
         }
+        /* Theme button entrance animation */
+        @keyframes theme-btn-in {
+          from { opacity: 0; transform: scale(0.85) translateX(-6px); }
+          to   { opacity: 1; transform: scale(1)    translateX(0); }
+        }
+        .theme-btn-enter {
+          animation: theme-btn-in 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
       `}</style>
 
       <div className="relative group">
@@ -326,7 +390,7 @@ function PromptComposer({
           <div className="p-6">
             <textarea
               aria-label="Prompt"
-              className="w-full bg-transparent border-none outline-none focus:ring-0 focus:border-transparent focus:outline-none font-body-lg text-body-lg text-on-surface resize-none placeholder:text-outline/60 p-0 m-0"
+              className="w-full bg-transparent border-none outline-none focus:ring-0 focus:border-transparent focus:outline-none font-body-lg text-body-lg text-on-surface resize-none placeholder:text-outline/60 p-0 m-0 max-h-[220px] overflow-y-auto"
               onChange={handleChange}
               onKeyDown={handleKeyDown}
               placeholder={placeholder}
@@ -439,6 +503,60 @@ function PromptComposer({
                 </select>
               </div>
 
+              {/* ── Theme Selector — only visible when Streamlit agent is selected ── */}
+              {isStreamlitSelected && (
+                <button
+                  id="theme-selector-btn"
+                  type="button"
+                  className={`theme-btn-enter flex items-center gap-1.5 px-3 py-1 rounded-full border transition-all duration-200 text-left select-none cursor-pointer ${
+                    selectedThemeId
+                      ? "border-primary/60 bg-primary/10 text-primary hover:bg-primary/15"
+                      : "text-on-surface-variant border-outline-variant/30 hover:text-white hover:bg-surface-variant/30"
+                  } ${isDeveloping ? "opacity-50 cursor-not-allowed pointer-events-none" : ""}`}
+                  onClick={() => {
+                    setLocalSelectedThemeId(selectedThemeId);
+                    setIsThemeModalOpen(true);
+                  }}
+                  disabled={isDeveloping}
+                  aria-label="Select UI theme"
+                >
+                  <span className="material-symbols-outlined text-[16px] pointer-events-none">
+                    palette
+                  </span>
+                  <span className="font-label-caps text-[11px] truncate pointer-events-none max-w-28">
+                    {isLoadingThemes
+                      ? "Loading…"
+                      : selectedTheme
+                        ? selectedTheme.name
+                        : "Select Theme"}
+                  </span>
+                  {selectedThemeId ? (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      aria-label="Clear theme"
+                      className="material-symbols-outlined text-[14px] pointer-events-auto opacity-70 hover:opacity-100 transition-opacity"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedThemeId(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.stopPropagation();
+                          setSelectedThemeId(null);
+                        }
+                      }}
+                    >
+                      close
+                    </span>
+                  ) : (
+                    <span className="material-symbols-outlined text-[16px] pointer-events-none">
+                      keyboard_arrow_down
+                    </span>
+                  )}
+                </button>
+              )}
+
               {/* Agent Selector (Multi-select Modal Trigger) */}
               <button
                 className="flex items-center gap-2 px-3 py-1 text-on-surface-variant hover:text-white rounded-full border border-outline-variant/30 hover:bg-surface-variant/30 transition-colors cursor-pointer text-left select-none"
@@ -525,63 +643,6 @@ function PromptComposer({
               </button>
             </div>
           </div>
-
-          {/* Metadata Context Bar
-          <div className="flex flex-wrap items-center gap-4 px-6 py-2 bg-surface-container-lowest border-t border-outline-variant/30 rounded-b-[24px]">
-            Project selector styled exactly as context chip
-            <div className="flex items-center gap-1.5 text-[11px] font-label-caps text-outline hover:text-on-surface cursor-pointer transition-colors relative">
-              <span className="material-symbols-outlined text-[14px]">folder</span>
-              <select
-                aria-label="Select project"
-                className="bg-transparent border-none outline-none focus:ring-0 focus:border-transparent focus:outline-none text-inherit font-inherit py-0 pl-0 pr-4 cursor-pointer select-none appearance-none"
-                onChange={(event) => setSelectedProjectId(event.target.value)}
-                value={selectedProjectId}
-                disabled={isDeveloping}
-                style={{ paddingRight: '12px' }}
-              >
-                {projects.length > 0 ? (
-                  projects.map((project) => (
-                    <option key={project.id} value={project.id} className="bg-surface text-on-surface">
-                      {project.name}
-                    </option>
-                  ))
-                ) : (
-                  <option value="" className="bg-surface text-on-surface">No projects</option>
-                )}
-              </select>
-              <span className="material-symbols-outlined text-[16px] absolute right-0 pointer-events-none">keyboard_arrow_down</span>
-            </div>
-
-            {contextItems.map((item) => (
-              <div 
-                className="flex items-center gap-1 text-[11px] font-label-caps text-outline hover:text-on-surface cursor-pointer transition-colors relative bg-transparent" 
-                key={item.label}
-              >
-                <span className="material-symbols-outlined text-[14px] pointer-events-none">{item.icon}</span>
-                <select
-                  aria-label={`Select ${item.label}`}
-                  className="bg-transparent border-none outline-none focus:ring-0 focus:border-transparent focus:outline-none text-inherit font-inherit py-0 pl-0 pr-4 cursor-pointer select-none appearance-none"
-                  disabled={isDeveloping}
-                  style={{ paddingRight: '12px' }}
-                  defaultValue={item.label}
-                >
-                  <option value={item.label} className="bg-surface text-on-surface">{item.label}</option>
-                  {item.label === 'Work locally' ? (
-                    <>
-                      <option value="Work in cloud" className="bg-surface text-on-surface">Work in cloud</option>
-                      <option value="Work on staging" className="bg-surface text-on-surface">Work on staging</option>
-                    </>
-                  ) : item.label === 'main' ? (
-                    <>
-                      <option value="dev" className="bg-surface text-on-surface">dev</option>
-                      <option value="staging" className="bg-surface text-on-surface">staging</option>
-                    </>
-                  ) : null}
-                </select>
-                <span className="material-symbols-outlined text-[16px] absolute right-0 pointer-events-none">keyboard_arrow_down</span>
-              </div>
-            ))}
-          </div> */}
         </div>
       </div>
 
@@ -818,6 +879,162 @@ function PromptComposer({
                 >
                   Apply
                 </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {/* ── Theme Selection Modal ─────────────────────────────────────────── */}
+      {isThemeModalOpen &&
+        createPortal(
+          <div className="fixed inset-0 z-1000 flex items-center justify-center p-4">
+            <div
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => setIsThemeModalOpen(false)}
+            />
+            <div className="relative w-full max-w-2xl bg-[#171717] border border-[#262626] rounded-2xl shadow-2xl flex flex-col max-h-[80vh] animate-step-fade-in z-10 overflow-hidden">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-[#262626] bg-[#141414]">
+                <h3 className="text-base font-semibold text-white flex items-center gap-2 select-none">
+                  <span className="material-symbols-outlined text-[20px] text-primary">
+                    palette
+                  </span>
+                  Select UI Theme
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setIsThemeModalOpen(false)}
+                  className="text-on-surface-variant hover:text-white p-1 hover:bg-[#262626] rounded transition-colors cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px]">
+                    close
+                  </span>
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="flex-1 overflow-y-auto p-6 scrollbar-thin">
+                {/* No-theme card */}
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setLocalSelectedThemeId(null)}
+                    className={`flex flex-col items-center justify-center p-5 rounded-xl border text-center gap-3 transition-all cursor-pointer select-none ${
+                      localSelectedThemeId === null
+                        ? "border-primary bg-primary/5 text-primary"
+                        : "border-[#262626] bg-[#1a1a1a]/50 hover:bg-[#202022] hover:border-[#333333] text-on-surface-variant hover:text-white"
+                    }`}
+                  >
+                    <div className="w-12 h-12 rounded-full bg-surface-container-highest flex items-center justify-center text-on-surface-variant">
+                      <span className="material-symbols-outlined text-[24px]">
+                        format_paint
+                      </span>
+                    </div>
+                    <div>
+                      <h4 className="text-[13px] font-semibold text-white">
+                        Default (No Theme)
+                      </h4>
+                      <p className="text-[11px] text-on-surface-variant mt-1">
+                        Use the agent's default UI style
+                      </p>
+                    </div>
+                    {localSelectedThemeId === null && (
+                      <span className="material-symbols-outlined text-primary text-[18px]">
+                        check_circle
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Theme cards — dynamically loaded from backend */}
+                  {isLoadingThemes ? (
+                    <div className="col-span-1 flex items-center justify-center py-8 text-on-surface-variant text-[12px] italic select-none">
+                      <span className="material-symbols-outlined text-[18px] mr-2 animate-spin">
+                        progress_activity
+                      </span>
+                      Loading themes…
+                    </div>
+                  ) : themes.length === 0 ? (
+                    <div className="col-span-1 flex items-center justify-center py-8 text-on-surface-variant text-[12px] italic select-none">
+                      No themes found. Add .md files to the server/themes/
+                      directory.
+                    </div>
+                  ) : (
+                    themes.map((theme) => {
+                      const isSelected = localSelectedThemeId === theme.id;
+                      return (
+                        <button
+                          key={theme.id}
+                          type="button"
+                          onClick={() => setLocalSelectedThemeId(theme.id)}
+                          className={`flex items-start p-5 rounded-xl border text-left gap-4 transition-all cursor-pointer select-none ${
+                            isSelected
+                              ? "border-primary bg-primary/5 text-white"
+                              : "border-[#262626] bg-[#1a1a1a]/50 hover:bg-[#202022] hover:border-[#333333] text-on-surface-variant hover:text-white"
+                          }`}
+                        >
+                          <div
+                            className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+                              isSelected
+                                ? "bg-primary/20 text-primary"
+                                : "bg-[#262626] text-on-surface-variant"
+                            }`}
+                          >
+                            <span className="material-symbols-outlined text-[20px]">
+                              style
+                            </span>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h4 className="text-[13px] font-semibold truncate text-white">
+                              {theme.name}
+                            </h4>
+                            {theme.description && (
+                              <p className="text-[10px] text-on-surface-variant mt-0.5 line-clamp-2">
+                                {theme.description}
+                              </p>
+                            )}
+                            <p className="text-[9px] text-on-surface-variant/50 mt-1 font-mono">
+                              {theme.filename}
+                            </p>
+                          </div>
+                          {isSelected && (
+                            <span className="material-symbols-outlined text-primary text-[18px] shrink-0">
+                              check_circle
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-[#262626] bg-[#141414] shrink-0">
+                <p className="text-[11px] text-on-surface-variant select-none">
+                  {localSelectedThemeId
+                    ? `Selected: ${themes.find((t) => t.id === localSelectedThemeId)?.name ?? localSelectedThemeId}`
+                    : "No theme selected — default UI style will be used"}
+                </p>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsThemeModalOpen(false)}
+                    className="px-4 py-2 text-[12px] text-on-surface-variant hover:text-white bg-transparent border border-outline-variant hover:bg-[#262626] rounded-lg transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedThemeId(localSelectedThemeId);
+                      setIsThemeModalOpen(false);
+                    }}
+                    className="px-5 py-2 text-[12px] font-semibold text-on-primary bg-primary hover:bg-primary/90 rounded-lg transition-colors cursor-pointer"
+                  >
+                    Apply
+                  </button>
+                </div>
               </div>
             </div>
           </div>,

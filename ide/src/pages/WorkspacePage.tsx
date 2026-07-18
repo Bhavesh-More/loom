@@ -424,6 +424,7 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
     promptText: string,
     selectedAgentIds: string[],
     chatSessionId?: string | null,
+    themeId?: string | null,
   ) => {
     if (!chatSessionId) {
       setActiveChatId(null);
@@ -475,6 +476,15 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
               updated.projectName = chunk.project_name || "";
               updated.status = "planning";
             } else if (chunk.type === "context") {
+              if (chunk.errors && chunk.errors.length > 0) {
+                updated.errors = [...updated.errors, ...chunk.errors];
+              }
+            } else if (chunk.type === "folder_structure") {
+              // Store planned dirs so the file explorer can show the skeleton
+              // before any agent writes actual files.
+              if (chunk.dirs && Array.isArray(chunk.dirs)) {
+                updated.contextFiles = chunk.dirs;
+              }
               if (chunk.errors && chunk.errors.length > 0) {
                 updated.errors = [...updated.errors, ...chunk.errors];
               }
@@ -590,6 +600,7 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
           });
         },
         chatSessionId,
+        themeId,
       );
     } catch (err: any) {
       setActiveSession((curr) => {
@@ -607,14 +618,16 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
     projectId: string,
     promptText: string,
     selectedAgentIds: string[],
+    themeId?: string | null,
   ) => {
-    await runPrompt(projectId, promptText, selectedAgentIds);
+    await runPrompt(projectId, promptText, selectedAgentIds, null, themeId);
   };
 
   const handleSendActivePrompt = async (
     projectId: string,
     promptText: string,
     selectedAgentIds: string[],
+    themeId?: string | null,
   ) => {
     if (!promptText.trim() || isDeveloping || !activeSession?.projectId) {
       return;
@@ -623,7 +636,7 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
       selectedAgentIds.length > 0
         ? selectedAgentIds
         : activeSession.selectedAgentIds || [];
-    await runPrompt(projectId, promptText.trim(), agentIds, activeChatId);
+    await runPrompt(projectId, promptText.trim(), agentIds, activeChatId, themeId);
   };
 
   const isDeveloping = activeSession
@@ -740,6 +753,56 @@ function WorkspacePage({ activePage, onNavigate }: WorkspacePageProps) {
                           {activeSession.qaResponse}
                         </div>
                       )}
+
+                      {/* Folder Structure Card — shown as soon as folder_structure SSE event arrives */}
+                      {activeSession.contextFiles &&
+                        activeSession.contextFiles.length > 0 && (
+                          <div
+                            className="flex flex-col gap-2 animate-step-fade-in"
+                            style={{ animationDelay: "0.18s" }}
+                          >
+                            <div className="flex items-center gap-2 text-on-surface-variant text-[12px] font-medium uppercase tracking-widest">
+                              <span className="material-symbols-outlined text-[15px] text-secondary">
+                                folder
+                              </span>
+                              Project Structure Planned
+                            </div>
+                            <div className="glass-panel rounded-xl border border-outline-variant/20 bg-[#0e0e0e]/60 overflow-hidden">
+                              <div className="px-4 py-3 border-b border-outline-variant/10 flex items-center gap-2">
+                                <span className="material-symbols-outlined text-[14px] text-secondary">
+                                  account_tree
+                                </span>
+                                <span className="font-code-md text-[11px] text-on-surface-variant">
+                                  {activeSession.contextFiles.length}{" "}
+                                  directories pre-created in sandbox
+                                </span>
+                              </div>
+                              <div className="px-4 py-3 font-mono text-[12px] text-secondary leading-[1.9] max-h-48 overflow-y-auto">
+                                {activeSession.contextFiles
+                                  .slice()
+                                  .sort()
+                                  .map((dir, i) => {
+                                    const depth =
+                                      (dir.match(/\//g) || []).length;
+                                    return (
+                                      <div
+                                        key={i}
+                                        className="flex items-center gap-1.5 text-on-surface-variant/80"
+                                        style={{
+                                          paddingLeft: `${depth * 14}px`,
+                                        }}
+                                      >
+                                        <span className="material-symbols-outlined text-[12px] text-secondary/60">
+                                          folder_open
+                                        </span>
+                                        <span>{dir.split("/").pop()}/</span>
+                                      </div>
+                                    );
+                                  })}
+                              </div>
+                            </div>
+                          </div>
+                        )}
 
                       {/* Agent Execution Tree — shown when task graph is available */}
                       {activeSession.taskGraphNodes.length > 0 && (

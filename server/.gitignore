@@ -41,9 +41,10 @@ outputs/
 logs/
 test_audit_logs/
 *.log
+workspaces/
 
 # ── Python version file (machine-specific) ────────────────────────────────────
 .python-version
 
 # ── uv lockfile — uncomment to ignore if you don't use uv for deployments ─────
-# uv.lock
+# uv.lock

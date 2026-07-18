@@ -8,18 +8,104 @@ from graph.state import LoomState
 from observability.execution_logger import log_execution_event
 from prompts.prompts import AGENT_PROMPT_MAP
 from services.knowledge_service import knowledge_service
-from tools.file_tools import validate_agent_output
+
+from tools.langgraph_tools import tool_list_files, tool_read_file, tool_grep, tool_edit_file, tool_write_new_file, tool_run_command
+from sandbox.manifest import load_manifest
+from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage
 
 logger = logging.getLogger(__name__)
 
 
-def _build_theme_block(theme: dict | None) -> str:
+def _build_theme_block(theme_content: str | None, theme: dict | None = None) -> str:
     """
-    Format the theme dict into a clear prompt block for the executor agent.
-    Returns an empty string when no theme is provided.
+    Build a comprehensive UI design-system prompt block for the executor.
+
+    Priority order:
+      1. theme_content (full Markdown from a theme .md file) — preferred.
+      2. theme dict (legacy token map) — backward-compat fallback.
+      3. Neither present → return empty string.
+
+    When theme_content is available the function wraps the raw Markdown
+    in a rich instructional scaffold so the Streamlit agent treats it as a
+    *complete design system* rather than a list of colours.
     """
+    if theme_content:
+        return f"""
+
+## ═══════════════════════════════════════════════════════
+## DESIGN SYSTEM — Full Specification
+## ═══════════════════════════════════════════════════════
+
+You are building a Streamlit UI application that must **fully internalize** the
+design system defined below.  This is not a style guide to reference — it is the
+complete visual identity of this application.  Every screen, every component,
+every interaction must embody this design language consistently.
+
+### Theme Design System (Complete Specification)
+
+{theme_content}
+
+### ── Implementation Directives ─────────────────────────────────────────────
+
+**VISUAL IDENTITY**
+Apply the complete design language from top to bottom.  Every screen must feel
+like it was crafted by the same experienced product designer.  Inconsistency is
+a failure mode.
+
+**COLOR SYSTEM**
+• Use the primary color for main CTAs, active states, and key interactive elements.
+• Honour the full surface hierarchy (canvas → card surface → elevated surface) to
+  create depth and visual separation between layers.
+• Use muted/ink tones for body text; reserve accent colors for intentional emphasis.
+• Never invent colors outside the defined palette.
+
+**TYPOGRAPHY**
+• Apply the exact font families specified.  Import any web fonts via st.markdown().
+• Scale headings (display → title → body → caption/label) precisely as defined.
+• Typography IS the hierarchy — let it lead the reader's eye without needing icons.
+• Set correct letter-spacing and line-height where Streamlit allows inline CSS.
+
+**SPACING & LAYOUT**
+• Apply the defined spacing units (padding, margin, gap) consistently throughout.
+• Prefer generous whitespace over cramming content — this is a premium UI.
+• Use columns and containers to mirror the grid system described by the theme.
+
+**COMPONENT STYLING** (apply via st.markdown with injected CSS)
+• Buttons: exact border-radius, padding, background, hover state.
+• Cards / containers: exact shadow, border-radius, background surface color.
+• Input fields: border style, focus ring color, placeholder color.
+• All interactive controls must feel cohesive — no mismatched border radii.
+
+**SHADOWS & ELEVATION**
+Apply the shadow/elevation system faithfully.  Cards and modals should feel
+lifted off the canvas; primary content surfaces should feel grounded.
+
+**ANIMATIONS & MICRO-INTERACTIONS**
+Where Streamlit allows CSS transitions, implement the motion principles defined
+(prefer 150–300 ms ease-out transitions for hover and state changes).
+Avoid abrupt or jarring changes.
+
+**UX PHILOSOPHY**
+Follow the UI philosophy section of the theme verbatim.  Prioritise clarity,
+scannability, and delight in that order.
+
+**ACCESSIBILITY**
+Maintain WCAG AA contrast ratios using the defined palette.  Use semantic HTML
+constructs within st.markdown() wherever possible.  Ensure interactive elements
+have visible focus indicators.
+
+**COHESION REQUIREMENT**
+Every generated screen must feel like part of the same product.  Run a final
+mental pass: "Does this look like it came from the same designer who specified
+the theme?"  If not, reconcile it before outputting.
+
+## ═══════════════════════════════════════════════════════
+"""
+
+    # ── Legacy fallback: dict of design tokens ────────────────────────────────
     if not theme:
         return ""
+
     return (
         "\n\n## UI Theme Tokens (apply these to all visual/UI code)\n"
         "The user has selected a custom theme. Use these design tokens exactly:\n"
@@ -48,12 +134,58 @@ def _build_planner_rules_block(step: dict) -> str:
     if avoid:
         parts.append("## Anti-patterns to Avoid\n" + "\n".join(f"- {a}" for a in avoid))
 
+    target_files = step.get("target_files", [])
+    if target_files:
+        files_str = "\n".join(
+            f"- `{f.get('path')}` ({f.get('action')}): {f.get('change')}" for f in target_files
+        )
+        parts.append("## Planned Files for this Step (MUST adhere to this structure)\n" + files_str)
+
     expected = step.get("expected_output", "")
     if expected:
         parts.append(f"## Expected Output\n{expected}")
 
     if not parts:
         return ""
+    return "\n\n" + "\n\n".join(parts)
+
+
+def _build_folder_structure_block(folder_structure: dict | None) -> str:
+    """
+    Format the pre-created project directory tree into a prompt block
+    so Ollama knows exactly where to write each file.
+
+    The block is injected into every executor step — agents must write
+    files ONLY inside the listed directories.
+    """
+    if not folder_structure:
+        return ""
+
+    dirs       = folder_structure.get("dirs", [])
+    file_hints = folder_structure.get("file_hints", {})
+
+    if not dirs and not file_hints:
+        return ""
+
+    parts = []
+
+    if dirs:
+        dirs_str = "\n".join(f"  {d}/" for d in sorted(dirs))
+        parts.append(
+            "## Pre-created Project Structure (CRITICAL — write files ONLY inside these dirs)\n"
+            "The following directories have been pre-created in the sandbox.\n"
+            "You MUST place every file you create inside the appropriate directory below.\n"
+            "Do NOT create arbitrary top-level files or folders outside this structure.\n"
+            f"```\n{dirs_str}\n```"
+        )
+
+    if file_hints:
+        hints_str = "\n".join(f"  {path}  →  {desc}" for path, desc in sorted(file_hints.items()))
+        parts.append(
+            "## Planned File Map (what goes where)\n"
+            + hints_str
+        )
+
     return "\n\n" + "\n\n".join(parts)
 
 
@@ -133,7 +265,24 @@ async def executor_node(state: LoomState) -> LoomState:
     planner_rules_block = _build_planner_rules_block(current_step)
 
     # ── Build theme block if theme was selected ───────────────────────────────
-    theme_block = _build_theme_block(state.get("theme"))
+    theme_block = _build_theme_block(
+        theme_content=state.get("theme_content"),
+        theme=state.get("theme"),
+    )
+
+    project_id = state.get("project_id", "default")
+    try:
+        manifest_data = load_manifest(project_id)
+    except Exception:
+        manifest_data = {"files": {}, "conventions": []}
+        
+    manifest_block = (
+        "\n\n## Current Project Files & Responsibilities:\n"
+        + json.dumps(manifest_data, indent=2)
+    )
+
+    # ── Build folder structure block from pre-created sandbox dirs ────────────
+    folder_structure_block = _build_folder_structure_block(state.get("folder_structure"))
 
     user_message = f"""
 Project Goal: {state['goal']}
@@ -148,9 +297,13 @@ repo map. Do not repeat broad repo scanning in your answer; write code against
 this context and only infer missing details when the context has an explicit gap.
 {context_block}
 {knowledge_block}
+{folder_structure_block}
 {planner_rules_block}
 {theme_block}
-Generate ALL required files now. Do not omit any file. Do not truncate any file.
+{manifest_block}
+
+Always use your provided tools to list, read, edit, and create files. Do not generate raw markdown code blocks.
+Project ID to use in your tool calls: {project_id}
 """
 
     llm = get_ollama_executor_llm()
@@ -169,77 +322,54 @@ Generate ALL required files now. Do not omit any file. Do not truncate any file.
             "step_index":      step_index,
             "task":            task,
             "context_keys":    context_keys,
-            "has_theme":       bool(state.get("theme")),
+            "has_theme":       bool(state.get("theme_content") or state.get("theme")),
+            "theme_id":        state.get("theme_id"),
             "messages":        messages,
         },
     )
 
     try:
-        output            = ""
-        validation_errors: list[str] = []
-        # Allow more attempts for complex UI agents like streamlit
-        max_attempts = 3 if agent_name in {"streamlit", "fastapi"} else 2
-
-        for attempt in range(max_attempts):
-            repair_block = ""
-            if validation_errors:
-                repair_block = (
-                    "\n\nThe previous output failed validation. Regenerate ALL files from "
-                    "scratch and fix these errors:\n"
-                    + "\n".join(f"- {error}" for error in validation_errors)
-                    + "\nDo not explain the fix. Return only # FILE-prefixed files. "
-                      "Do not omit any file."
-                )
-
-            attempt_messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user",   "content": user_message + repair_block},
-            ]
-
-            print(
-                f"[Executor] Calling Ollama Cloud for agent '{agent_name}' (attempt {attempt + 1}/{max_attempts})..."
-            )
-
-            response = await llm.ainvoke(attempt_messages)
-            output   = response.content
-
-            validation_errors = validate_agent_output(
-                agent_name,
-                output,
-                goal_or_task=f"{state['goal']}\n{task}",
-            )
-
-            if not validation_errors:
-                messages = attempt_messages
+        output = ""
+        sandbox_tools = [tool_list_files, tool_read_file, tool_grep, tool_edit_file, tool_write_new_file, tool_run_command]
+        tool_map = {t.name: t for t in sandbox_tools}
+        llm_with_tools = llm.bind_tools(sandbox_tools)
+        
+        chat_history = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=user_message)
+        ]
+        
+        print(f"[Executor] Calling Ollama Cloud for agent '{agent_name}' with tools...")
+        max_tool_iterations = 15
+        
+        for iteration in range(max_tool_iterations):
+            response = await llm_with_tools.ainvoke(chat_history)
+            chat_history.append(response)
+            
+            if not response.tool_calls:
+                output = response.content
                 break
-
-            print(
-                f"[Executor] Agent '{agent_name}' output failed validation on attempt {attempt + 1}: {validation_errors}"
-            )
-            log_execution_event(
-                "agent.validation_failed",
-                {
-                    "project_id":      state.get("project_id"),
-                    "chat_session_id": state.get("chat_session_id"),
-                    "agent":           agent_name,
-                    "step_index":      step_index,
-                    "attempt":         attempt + 1,
-                    "errors":          validation_errors,
-                },
-            )
-
-        # No hardcoded fallback — if Ollama cannot produce valid output, raise.
-        if validation_errors:
-            raise ValueError(
-                f"Agent '{agent_name}' failed to generate valid output after "
-                f"{max_attempts} attempt(s). Validation errors: "
-                + "; ".join(validation_errors)
-            )
+                
+            for tool_call in response.tool_calls:
+                t_name = tool_call["name"]
+                t_args = tool_call["args"].copy()
+                if "project_id" not in t_args:
+                    t_args["project_id"] = project_id
+                    
+                print(f"  -> Agent called tool: {t_name}")
+                try:
+                    tool_func = tool_map.get(t_name)
+                    if tool_func:
+                        tool_result = tool_func.invoke(t_args)
+                    else:
+                        tool_result = f"Error: Tool {t_name} not found."
+                except Exception as e:
+                    tool_result = f"Error executing {t_name}: {str(e)}"
+                    
+                chat_history.append(ToolMessage(content=str(tool_result), tool_call_id=tool_call["id"]))
 
         state["agent_outputs"][agent_name] = output
-        print(
-            f"[Executor] Agent '{agent_name}' completed successfully. Output: {len(output)} chars"
-        )
+        print(f"[Executor] Agent '{agent_name}' completed successfully.")
 
         # ── Record successful execution in knowledge/memory system ───────────
         if chat_session_id:
