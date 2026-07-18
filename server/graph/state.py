@@ -34,3 +34,24 @@ class LoomState(TypedDict):
     # Stores the serialized TaskGraph dict and per-node agent selection logs.
     task_graph: Optional[dict]
     task_graph_logs: Optional[list[str]]
+
+    # Legacy: dict-based theme tokens (kept for backward compatibility).
+    theme: Optional[dict]
+
+    # New: file-based theme system.
+    # theme_id  — stem of the selected .md file, e.g. "theme_claude"
+    # theme_content — full raw Markdown of the selected theme file, read by
+    #                 the backend before entering the graph so the executor
+    #                 can build a comprehensive design-system prompt block.
+    theme_id: Optional[str]
+    theme_content: Optional[str]
+
+    # The full enriched architecture blueprint produced by the Planner.
+    # Stored separately so the executor can reference it without re-parsing the plan list.
+    architecture_blueprint: Optional[dict]
+
+    # The planned folder tree produced by folder_structure_node.
+    # Shape: {"dirs": ["backend/api", "backend/db", ...], "file_hints": {"path": "description"}}
+    # Pre-created inside the sandbox before any executor runs.
+    folder_structure: Optional[dict]
+

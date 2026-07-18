@@ -1,7 +1,7 @@
 import os
 import json
 import re
-from langchain_groq import ChatGroq
+from graph.llm_clients import get_groq_qa_llm
 from graph.llm_utils import compact_text
 from graph.state import LoomState
 from db.database import database
@@ -76,12 +76,7 @@ async def qa_node(state: LoomState) -> LoomState:
     if agent_memories:
         memories_block = "\nRetrieved user preferences and memories:\n" + "\n".join(agent_memories)
 
-    llm = ChatGroq(
-        model="llama-3.3-70b-versatile",
-        api_key=os.environ.get("GROQ_API_KEY_1"),
-        temperature=0.5,
-        max_tokens=2048,
-    )
+    llm = get_groq_qa_llm()
 
     context_payload_text = compact_text(state.get('context_payload_text', ''), 7000)
     memories_block = compact_text(memories_block, 3000)

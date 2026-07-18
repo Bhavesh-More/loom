@@ -2,6 +2,7 @@ psycopg2
 dotenv
 langgraph
 langchain-groq
+langchain-openai
 asyncpg
 fastapi
 uvicorn

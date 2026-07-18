@@ -1,6 +1,6 @@
 import json
 import os
-from langchain_groq import ChatGroq
+from graph.llm_clients import get_groq_router_llm
 from graph.state import LoomState
 
 ROUTER_SYSTEM_PROMPT = """
@@ -55,12 +55,7 @@ def router_node(state: LoomState) -> LoomState:
     """
     print("\n[Router] Classifying query...")
 
-    llm = ChatGroq(
-        model="llama-3.3-70b-versatile",
-        api_key=os.environ.get("GROQ_API_KEY_1"),
-        temperature=0.0,
-        max_tokens=512,
-    )
+    llm = get_groq_router_llm()
 
     user_message = f"""
 User Query: {state['goal']}

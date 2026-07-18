@@ -1,0 +1,16 @@
+FROM python:3.11-slim
+
+# Common deps every generated app is likely to need — extend per your agents' domains
+RUN pip install --no-cache-dir \
+    streamlit==1.38.0 \
+    pandas \
+    requests \
+    python-dotenv
+
+# Non-root user — agents write generated (untrusted-ish) code, don't run as root
+RUN useradd -m -u 1000 sandboxuser
+WORKDIR /workspace
+RUN chown -R sandboxuser:sandboxuser /workspace
+USER sandboxuser
+
+EXPOSE 8501

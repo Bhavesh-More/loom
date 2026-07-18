@@ -1,3 +1,4 @@
+from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
@@ -5,6 +6,9 @@ from fastapi import APIRouter, HTTPException
 from db.schema.project import CreateProjectRequest, CreateProjectResponse
 from dependencies.project_dep import project_service
 from db.chat import ChatRepository
+
+# Directory where theme .md files live
+_THEMES_DIR = Path(__file__).parent.parent.parent / "themes"
 
 router = APIRouter(
     prefix="/projects",
@@ -77,6 +81,10 @@ class DevelopProjectRequest(BaseModel):
     prompt: str
     selected_agent_ids: list[UUID] = []
     chat_session_id: UUID | None = None
+    # Legacy: dict of design tokens (kept for backward compatibility)
+    theme: dict | None = None
+    # New: identifier of the selected theme .md file (e.g. "theme_claude")
+    theme_id: str | None = None
 
 chat_repository = ChatRepository(database)
 
@@ -153,25 +161,43 @@ async def develop_project(request: DevelopProjectRequest):
                 }
             })
 
-            # 4. Invoke the orchestrator using those agents
+            # 4. Resolve theme content from the selected theme file
+            theme_content: str | None = None
+            if request.theme_id:
+                theme_path = _THEMES_DIR / f"{request.theme_id}.md"
+                if theme_path.exists() and theme_path.is_file():
+                    try:
+                        theme_content = theme_path.read_text(encoding="utf-8")
+                    except Exception:
+                        theme_content = None
+
+            # 5. Invoke the orchestrator using those agents
             initial_state = {
-                "project_id": str(request.project_id),
-                "project_name": project["name"],
-                "goal": request.prompt,
-                "selected_agents": selected_agents,
-                "active_agents": [],
-                "query_type": "",
-                "qa_response": "",
-                "execution_plan": [],
-                "current_step": 0,
-                "agent_outputs": {},
-                "workspace_path": str(workspace_service.get_workspace_path(project["name"])),
-                "errors": [],
-                "context_payload": {},
-                "context_payload_text": "",
-                "chat_session_id": str(chat_session_id),
-                "task_graph": None,
-                "task_graph_logs": [],
+                "project_id":             str(request.project_id),
+                "project_name":           project["name"],
+                "goal":                   request.prompt,
+                "selected_agents":        selected_agents,
+                "active_agents":          [],
+                "query_type":             "",
+                "qa_response":            "",
+                "execution_plan":         [],
+                "current_step":           0,
+                "agent_outputs":          {},
+                "workspace_path":         str(workspace_service.get_workspace_path(project["name"])),
+                "errors":                 [],
+                "context_payload":        {},
+                "context_payload_text":   "",
+                "chat_session_id":        str(chat_session_id),
+                "task_graph":             None,
+                "task_graph_logs":        [],
+                # Legacy theme dict (backward-compat)
+                "theme":                  request.theme,
+                # New file-based theme
+                "theme_id":               request.theme_id,
+                "theme_content":          theme_content,
+                "architecture_blueprint": None,
+                # Folder structure node will populate this before executor runs
+                "folder_structure":       None,
             }
 
             yield json.dumps({
@@ -210,6 +236,31 @@ async def develop_project(request: DevelopProjectRequest):
                         "message": f"Repository context prepared with {len(context_files)} relevant file(s).",
                         "file_count": len(context_files),
                         "errors": errors
+                    }) + "\n"
+                elif node_name == "folder_structure":
+                    folder_structure = state_update.get("folder_structure") or {}
+                    dirs             = folder_structure.get("dirs", [])
+                    source           = folder_structure.get("source", "unknown")
+                    sandbox_result   = folder_structure.get("sandbox_result", {})
+                    created_count    = len(sandbox_result.get("created", []))
+                    messages_to_insert.append({
+                        "session_id": chat_session_id,
+                        "role": "system",
+                        "message_type": "system_event",
+                        "content": {
+                            "text": f"Project folder structure planned ({len(dirs)} dirs, {created_count} pre-created in sandbox).",
+                            "dirs": dirs,
+                            "source": source,
+                            "errors": errors
+                        }
+                    })
+                    yield json.dumps({
+                        "type":          "folder_structure",
+                        "message":       f"Project folder structure planned ({len(dirs)} dirs, {created_count} pre-created in sandbox).",
+                        "dirs":          dirs,
+                        "source":        source,
+                        "created_count": created_count,
+                        "errors":        errors
                     }) + "\n"
                 elif node_name == "planner":
                     plan = state_update.get("execution_plan", [])

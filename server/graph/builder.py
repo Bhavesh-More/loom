@@ -7,6 +7,7 @@ from graph.qa_node import qa_node
 from graph.planner_node import planner_node
 from graph.router_node import router_node
 from graph.file_writer_node import file_writer_node
+from graph.folder_structure_node import folder_structure_node
 from context_system.langgraph_node import context_understanding_node_async
 
 # ---------------------------------------------------------------------------
@@ -56,6 +57,8 @@ def build_graph() -> StateGraph:
           ├─ "qa"      → qa_node → END
           └─ "codegen" → planner
                            ↓
+                    folder_structure   ← plans dirs, pre-creates in sandbox
+                           ↓
                          executor ←──────────┐
                            ↓                 │
                     [should_continue]──"continue"
@@ -69,12 +72,13 @@ def build_graph() -> StateGraph:
     graph = StateGraph(LoomState)
 
     # Register all nodes
-    graph.add_node("router",      router_node)
+    graph.add_node("router",           router_node)
     graph.add_node("context_understanding", context_understanding_node_async)
-    graph.add_node("qa",          qa_node)
-    graph.add_node("planner",     planner_node)
-    graph.add_node("executor",    executor_node)
-    graph.add_node("file_writer", file_writer_node)
+    graph.add_node("qa",               qa_node)
+    graph.add_node("planner",          planner_node)
+    graph.add_node("folder_structure", folder_structure_node)
+    graph.add_node("executor",         executor_node)
+    graph.add_node("file_writer",      file_writer_node)
 
     # Entry point first builds reusable repo context for downstream agents.
     graph.set_entry_point("context_understanding")
@@ -93,8 +97,11 @@ def build_graph() -> StateGraph:
     # qa → END (no file writing for QA)
     graph.add_edge("qa", END)
 
-    # planner → executor (always)
-    graph.add_edge("planner", "executor")
+    # planner → folder_structure (plan and pre-create the directory skeleton)
+    graph.add_edge("planner", "folder_structure")
+
+    # folder_structure → executor
+    graph.add_edge("folder_structure", "executor")
 
     # executor → loop or done
     graph.add_conditional_edges(

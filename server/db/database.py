@@ -12,6 +12,7 @@ class Database:
         self.pool = None
 
     async def connect(self):
+        print("DATABASE_URL:", repr(os.getenv("DATABASE_URL")))
         if self.pool is not None:
             return
         self.pool = await asyncpg.create_pool(

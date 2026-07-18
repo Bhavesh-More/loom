@@ -13,6 +13,7 @@ from context_system.models import CodeChunk, FileMatch, RankedChunk
 class EmbeddingProvider:
     _model = None
     _lock = asyncio.Lock()
+    _encode_lock = asyncio.Lock()
 
     async def load(self) -> None:
         if self._model is not None:
@@ -28,11 +29,12 @@ class EmbeddingProvider:
                 self._model = False
 
     async def encode(self, text: str) -> list[float]:
-        await self.load()
-        if self._model:
-            vector = await asyncio.to_thread(self._model.encode, text)
-            return [float(value) for value in vector]
-        return self._hash_embedding(text)
+        async with self._encode_lock:
+            await self.load()
+            if self._model:
+                vector = await asyncio.to_thread(self._model.encode, text)
+                return [float(value) for value in vector]
+            return self._hash_embedding(text)
 
     def _hash_embedding(self, text: str) -> list[float]:
         buckets = [0.0] * 384
