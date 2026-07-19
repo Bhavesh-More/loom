@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  loom-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: loom-server
+    ports:
+      - "8000:8000"
+    environment:
+      # Database
+      - DATABASE_URL=${DATABASE_URL}
+      
+      # Groq API (Router, Planner, QA nodes)
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      
+      # Ollama Cloud (Executor node)
+      - OLLAMA_API_KEY=${OLLAMA_API_KEY}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-https://api.ollama.com/v1}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-devstral}
+      
+      # Optional Redis
+      - REDIS_URL=${REDIS_URL}
+      
+      # Feature flags
+      - LOOM_CONTEXT_LOGS=${LOOM_CONTEXT_LOGS:-false}
+      - CONTEXT_USE_LOCAL_EMBEDDINGS=${CONTEXT_USE_LOCAL_EMBEDDINGS:-false}
+      - PONYTAIL_MODE=${PONYTAIL_MODE:-full}
+      
+      # CORS origins
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173,http://localhost:5174,http://localhost:5175}
+    volumes:
+      # Mount workspaces directory for generated projects
+      - ./workspaces:/app/workspaces
+      # Mount outputs directory for sandbox results
+      - ./outputs:/app/outputs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    networks:
+      - loom-network
+
+networks:
+  loom-network:
+    driver: bridge
