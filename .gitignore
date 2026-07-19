@@ -95,4 +95,9 @@ ide/reference-chat-middle.html
 # ── Misc ──────────────────────────────────────────────────────────────────────
 *.log
 *.sqlite
-*.db
+*.db
+
+changes_needed.md
+FIX_25_NOTES.md
+IMPLEMENTATION_NOTES.md
+REDIS_SETUP.md
