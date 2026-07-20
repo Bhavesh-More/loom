@@ -18,6 +18,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 COPY pyproject.toml uv.lock ./
 
 # Install dependencies
+RUN uv pip install --system --index-url https://download.pytorch.org/whl/cpu torch
 RUN uv sync --frozen --no-dev
 
 # Runtime stage
@@ -27,8 +28,10 @@ WORKDIR /app
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    libpq-dev \
     postgresql-client \
-    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy uv and dependencies from builder
