@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from config.config import QWEN_MODEL
 from orchestration.planning.agent_registry import (
     AGENT_REGISTRY,
     AgentProfile,
@@ -22,7 +23,7 @@ def test_get_agent_profile() -> None:
     assert profile.name == "PostgreSQL Database Agent"
     assert profile.category == "database"
     assert "sql" in profile.capabilities
-    assert profile.model_profile == "qwen/qwen3-32b"
+    assert profile.model_profile == QWEN_MODEL
     assert profile.cost_category == "medium"
 
 

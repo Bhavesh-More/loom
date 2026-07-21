@@ -18,12 +18,14 @@ from langchain_groq import ChatGroq
 from langchain_openai import ChatOpenAI
 
 
-# ─── Model constants (read from env with sensible defaults) ─────────────────
+from config.config import GROQ_FAST_MODEL, GROQ_PLANNER_MODEL, OLLAMA_MODEL
 
-_GROQ_PLANNER_MODEL   = os.environ.get("GROQ_PLANNER_MODEL", "qwen/qwen3-32b")
-_GROQ_FAST_MODEL      = os.environ.get("GROQ_FAST_MODEL",    "llama-3.3-70b-versatile")
-_OLLAMA_BASE_URL      = os.environ.get("OLLAMA_BASE_URL",    "https://api.ollama.com/v1")
-_OLLAMA_MODEL         = os.environ.get("OLLAMA_MODEL",       "devstral")
+# ─── Model constants ─────────────────────────────────────────────────────────
+
+_GROQ_PLANNER_MODEL = GROQ_PLANNER_MODEL
+_GROQ_FAST_MODEL = GROQ_FAST_MODEL
+_OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "https://api.ollama.com/v1")
+_OLLAMA_MODEL = OLLAMA_MODEL
 
 
 # ─── Groq LLM factories ─────────────────────────────────────────────────────

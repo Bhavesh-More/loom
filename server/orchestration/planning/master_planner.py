@@ -8,6 +8,7 @@ from typing import Any
 
 from langchain_groq import ChatGroq
 
+from config.config import QWEN_MODEL
 from db.database import database
 from graph.llm_utils import compact_text
 from observability.execution_logger import log_execution_event
@@ -82,7 +83,7 @@ class MasterPlanner:
             return self._calculator_plan_json(task, context, run_id)
 
         llm = self.llm or ChatGroq(
-            model="qwen/qwen3-32b",
+            model=QWEN_MODEL,
             api_key=os.environ.get("GROQ_API_KEY_1"),
             temperature=0.2,
             max_tokens=1536,

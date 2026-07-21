@@ -50,8 +50,10 @@ class MemoryReflectionEngine:
             return fallback_data
 
         try:
+            from config.config import GROQ_FAST_MODEL
+
             llm = ChatGroq(
-                model="llama-3.3-70b-versatile",
+                model=GROQ_FAST_MODEL,
                 api_key=api_key,
                 temperature=0.1,
                 max_tokens=1024,

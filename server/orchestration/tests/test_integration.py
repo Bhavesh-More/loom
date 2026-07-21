@@ -338,8 +338,7 @@ async def test_planner_node_execution_populates_task_graph_in_state() -> None:
         task_graph_logs=[]
     )
 
-    # Use patch to mock ChatGroq instantiation and DecompositionEngine
-    with patch("graph.planner_node.ChatGroq", return_value=mock_llm), \
+    with patch("graph.planner_node.get_groq_planner_llm", return_value=mock_llm), \
          patch("graph.planner_node.DecompositionEngine") as mock_engine_cls:
         
         mock_engine = MagicMock()

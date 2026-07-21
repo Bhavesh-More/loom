@@ -7,6 +7,7 @@ from typing import Any
 
 from langchain_groq import ChatGroq
 
+from config.config import QWEN_MODEL
 from graph.llm_utils import compact_text
 from orchestration.planning.agent_router import route_task
 from orchestration.planning.task_graph import TaskGraph, TaskNode
@@ -79,9 +80,8 @@ class DecompositionEngine:
     async def _llm_decompose(self, task: str, context: dict[str, Any]) -> dict[str, Any]:
         if not os.getenv("GROQ_API_KEY_1") and self.llm is None:
             return {}
-
         llm = self.llm or ChatGroq(
-            model="qwen/qwen3-32b",
+            model=QWEN_MODEL,
             api_key=os.environ.get("GROQ_API_KEY_1"),
             temperature=0.2,
             max_tokens=1536,

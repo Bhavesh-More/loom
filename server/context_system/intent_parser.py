@@ -26,10 +26,11 @@ class IntentParser:
             return self._heuristic_parse(prompt)
 
     async def _parse_with_llm(self, prompt: str) -> dict:
+        from config.config import GROQ_FAST_MODEL
         from langchain_groq import ChatGroq
 
         llm = ChatGroq(
-            model="llama-3.3-70b-versatile",
+            model=GROQ_FAST_MODEL,
             api_key=os.environ.get("GROQ_API_KEY_1"),
             temperature=0.0,
             max_tokens=512,
