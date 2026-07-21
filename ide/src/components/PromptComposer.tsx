@@ -113,7 +113,7 @@ function PromptComposer({
       setDevelopSuccess("");
       try {
         const response = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000"}/projects`,
+          `${import.meta.env.VITE_BACKEND_ADDR ?? import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000"}/projects`,
           {
             method: "POST",
             headers: {
