@@ -6,11 +6,13 @@ class ProjectService:
         self,
         db,
         project_repository,
-        project_agent_repository
+        project_agent_repository,
+        user_agent_repository=None,
     ):
         self.db = db
         self.project_repository = project_repository
         self.project_agent_repository = project_agent_repository
+        self.user_agent_repository = user_agent_repository
 
 
     async def create_project(
@@ -25,6 +27,14 @@ class ProjectService:
         try:
 
             async with conn.transaction():
+                if agent_ids and self.user_agent_repository is not None:
+                    downloaded_agent_ids = await self.user_agent_repository.get_downloaded_agent_ids(conn, user_id)
+                    missing_agent_ids = sorted(set(agent_ids) - downloaded_agent_ids)
+                    if missing_agent_ids:
+                        raise ValueError(
+                            "Cannot attach agents that are not downloaded by the current user: "
+                            + ", ".join(missing_agent_ids)
+                        )
 
                 project = await self.project_repository.create_project(
                     conn=conn,

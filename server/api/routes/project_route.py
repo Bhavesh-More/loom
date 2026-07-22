@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from db.schema.project import CreateProjectRequest, CreateProjectResponse
 from dependencies.project_dep import project_service
 from db.chat import ChatRepository
+from db.user_agent import UserAgentRepository
 from dependencies.auth_dep import CurrentUser, get_current_user
 
 # Directory where theme .md files live
@@ -22,12 +23,15 @@ async def create_project(
     request: CreateProjectRequest,
     current_user: CurrentUser = Depends(get_current_user)
 ):
-    return await project_service.create_project(
-        user_id=current_user.id,
-        name=request.name,
-        description=request.description,
-        agent_ids=[str(agent_id) for agent_id in request.agent_ids]
-    )
+    try:
+        return await project_service.create_project(
+            user_id=current_user.id,
+            name=request.name,
+            description=request.description,
+            agent_ids=[str(agent_id) for agent_id in request.agent_ids]
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.get("/{project_id}")
@@ -95,6 +99,7 @@ class DevelopProjectRequest(BaseModel):
     theme_id: str | None = None
 
 chat_repository = ChatRepository(database)
+user_agent_repository = UserAgentRepository(database)
 
 @router.post("/develop")
 async def develop_project(
@@ -124,6 +129,15 @@ async def develop_project(
                 yield json.dumps({
                     "type": "error",
                     "message": "No agents selected. Download agents from the Marketplace and select them before running."
+                }) + "\n"
+                return
+            downloaded_agent_ids = await user_agent_repository.get_downloaded_agent_ids(conn, current_user.id)
+            unauthorized_agent_ids = sorted(set(agent_ids) - downloaded_agent_ids)
+            if unauthorized_agent_ids:
+                yield json.dumps({
+                    "type": "error",
+                    "message": "Some selected agents are not downloaded for the current user.",
+                    "agent_ids": unauthorized_agent_ids,
                 }) + "\n"
                 return
 
@@ -192,6 +206,7 @@ async def develop_project(
 
             # 5. Invoke the orchestrator using those agents
             initial_state = {
+                "user_id":                current_user.id,
                 "project_id":             str(request.project_id),
                 "project_name":           project["name"],
                 "goal":                   request.prompt,

@@ -57,7 +57,8 @@ export async function getAgents(forceRefresh = false): Promise<AgentData[]> {
     try {
       const response = await authFetch(apiUrl('/agents'))
       if (!response.ok) {
-        throw new Error('Failed to fetch agents')
+        const detail = await response.text()
+        throw new Error(detail || `Failed to fetch agents (${response.status})`)
       }
 
       const data: AgentData[] = await response.json()
