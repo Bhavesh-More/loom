@@ -1,11 +1,12 @@
 from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from db.schema.project import CreateProjectRequest, CreateProjectResponse
 from dependencies.project_dep import project_service
 from db.chat import ChatRepository
+from dependencies.auth_dep import CurrentUser, get_current_user
 
 # Directory where theme .md files live
 _THEMES_DIR = Path(__file__).parent.parent.parent / "themes"
@@ -17,8 +18,12 @@ router = APIRouter(
 
 
 @router.post("", response_model=CreateProjectResponse)
-async def create_project(request: CreateProjectRequest):
+async def create_project(
+    request: CreateProjectRequest,
+    current_user: CurrentUser = Depends(get_current_user)
+):
     return await project_service.create_project(
+        user_id=current_user.id,
         name=request.name,
         description=request.description,
         agent_ids=[str(agent_id) for agent_id in request.agent_ids]
@@ -26,8 +31,11 @@ async def create_project(request: CreateProjectRequest):
 
 
 @router.get("/{project_id}")
-async def get_project(project_id: UUID):
-    project = await project_service.get_project(str(project_id))
+async def get_project(
+    project_id: UUID,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    project = await project_service.get_project(str(project_id), current_user.id)
 
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -36,8 +44,8 @@ async def get_project(project_id: UUID):
 
 
 @router.post("/get-projects")
-async def get_projects():
-    projects = await project_service.get_projects()
+async def get_projects(current_user: CurrentUser = Depends(get_current_user)):
+    projects = await project_service.get_projects(current_user.id)
     return projects
 
 
@@ -89,14 +97,21 @@ class DevelopProjectRequest(BaseModel):
 chat_repository = ChatRepository(database)
 
 @router.post("/develop")
-async def develop_project(request: DevelopProjectRequest):
+async def develop_project(
+    request: DevelopProjectRequest,
+    current_user: CurrentUser = Depends(get_current_user)
+):
     async def event_generator():
         conn = await database.get_conn()
         messages_to_insert = []
         chat_session_id = None
         try:
             # 1. Fetch project by ID
-            project = await project_service.project_repository.get_project_by_id(conn, str(request.project_id))
+            project = await project_service.project_repository.get_project_by_id_for_user(
+                conn,
+                str(request.project_id),
+                current_user.id
+            )
             if not project:
                 yield json.dumps({"type": "error", "message": "Project not found"}) + "\n"
                 return
@@ -129,7 +144,11 @@ async def develop_project(request: DevelopProjectRequest):
 
             # Create a chat session for a new chat, or append to the active one for follow-up prompts.
             if request.chat_session_id:
-                existing_session = await chat_repository.get_chat_session(conn, str(request.chat_session_id))
+                existing_session = await chat_repository.get_chat_session_for_user(
+                    conn,
+                    str(request.chat_session_id),
+                    current_user.id
+                )
                 if not existing_session:
                     yield json.dumps({"type": "error", "message": "Chat session not found"}) + "\n"
                     return

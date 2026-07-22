@@ -1,8 +1,8 @@
 from uuid import UUID
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
-from config.contant import DEV_USER_ID
+from dependencies.auth_dep import CurrentUser, get_current_user
 from db.user_agent import UserAgentRepository
 
 from db.database import database
@@ -130,12 +130,12 @@ AGENT_METADATA = {
 }
 
 @router.get("")
-async def get_agents():
+async def get_agents(current_user: CurrentUser = Depends(get_current_user)):
     conn = await database.get_conn()
     try:
         agent_rows = await conn.fetch("SELECT * FROM agents")
         source_rows = await conn.fetch("SELECT agent_id, url FROM agent_sources WHERE is_active = TRUE")
-        downloaded_agent_ids = await user_agent_repository.get_downloaded_agent_ids(conn, DEV_USER_ID)
+        downloaded_agent_ids = await user_agent_repository.get_downloaded_agent_ids(conn, current_user.id)
         
         sources_by_agent = {}
         for s in source_rows:
@@ -190,22 +190,28 @@ async def get_agents():
 
 
 @router.post("/{agent_id}/download")
-async def download_agent(agent_id: UUID):
+async def download_agent(
+    agent_id: UUID,
+    current_user: CurrentUser = Depends(get_current_user)
+):
     conn = await database.get_conn()
     try:
         async with conn.transaction():
-            await user_agent_repository.download_agent(conn, DEV_USER_ID, str(agent_id))
+            await user_agent_repository.download_agent(conn, current_user.id, str(agent_id))
         return {"status": "downloaded", "agent_id": str(agent_id)}
     finally:
         await database.release_conn(conn)
 
 
 @router.delete("/{agent_id}/download")
-async def uninstall_agent(agent_id: UUID):
+async def uninstall_agent(
+    agent_id: UUID,
+    current_user: CurrentUser = Depends(get_current_user)
+):
     conn = await database.get_conn()
     try:
         async with conn.transaction():
-            await user_agent_repository.uninstall_agent(conn, DEV_USER_ID, str(agent_id))
+            await user_agent_repository.uninstall_agent(conn, current_user.id, str(agent_id))
         return {"status": "uninstalled", "agent_id": str(agent_id)}
     finally:
         await database.release_conn(conn)

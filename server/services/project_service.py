@@ -1,7 +1,5 @@
 from pathlib import Path
 
-from config.contant import DEV_USER_ID
-
 
 class ProjectService:
     def __init__(
@@ -17,6 +15,7 @@ class ProjectService:
 
     async def create_project(
         self,
+        user_id: str,
         name: str,
         description: str | None,
         agent_ids: list[str]
@@ -29,7 +28,7 @@ class ProjectService:
 
                 project = await self.project_repository.create_project(
                     conn=conn,
-                    user_id=DEV_USER_ID,
+                    user_id=user_id,
                     name=name,
                     description=description
                 )
@@ -57,26 +56,28 @@ class ProjectService:
 
     async def get_project(
         self,
-        project_id: str
+        project_id: str,
+        user_id: str
     ):
         conn = await self.db.get_conn()
 
         try:
-            return await self.project_repository.get_project_by_id(
+            return await self.project_repository.get_project_by_id_for_user(
                 conn=conn,
-                project_id=project_id
+                project_id=project_id,
+                user_id=user_id
             )
         finally:
             await self.db.release_conn(conn)
 
 
-    async def get_projects(self):
+    async def get_projects(self, user_id: str):
         conn = await self.db.get_conn()
 
         try:
             return await self.project_repository.get_projects(
                 conn=conn,
-                user_id=DEV_USER_ID
+                user_id=user_id
             )
         finally:
             await self.db.release_conn(conn)
