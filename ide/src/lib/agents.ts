@@ -1,4 +1,8 @@
-const API_BASE_URL = import.meta.env.VITE_BACKEND_ADDR ?? import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000'
+import {
+  apiUrl,
+  authFetch,
+  registerAuthCacheResetter,
+} from './authFetch'
 
 export type AgentCategory =
   | 'API'
@@ -34,6 +38,8 @@ export function invalidateAgentsCache() {
   agentsFetchPromise = null
 }
 
+registerAuthCacheResetter(invalidateAgentsCache)
+
 export async function getAgents(forceRefresh = false): Promise<AgentData[]> {
   if (forceRefresh) {
     invalidateAgentsCache()
@@ -49,7 +55,7 @@ export async function getAgents(forceRefresh = false): Promise<AgentData[]> {
 
   agentsFetchPromise = (async () => {
     try {
-      const response = await fetch(`${API_BASE_URL.replace(/\/$/, '')}/agents`)
+      const response = await authFetch(apiUrl('/agents'))
       if (!response.ok) {
         throw new Error('Failed to fetch agents')
       }
@@ -75,7 +81,7 @@ function notifyAgentsChanged() {
 }
 
 export async function downloadAgent(agentId: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL.replace(/\/$/, '')}/agents/${agentId}/download`, {
+  const response = await authFetch(apiUrl(`/agents/${agentId}/download`), {
     method: 'POST',
   })
 
@@ -88,7 +94,7 @@ export async function downloadAgent(agentId: string): Promise<void> {
 }
 
 export async function uninstallAgent(agentId: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL.replace(/\/$/, '')}/agents/${agentId}/download`, {
+  const response = await authFetch(apiUrl(`/agents/${agentId}/download`), {
     method: 'DELETE',
   })
 
