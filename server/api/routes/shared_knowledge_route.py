@@ -1,9 +1,14 @@
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from typing import Any, Dict, List
 from knowledge.sync_manager import sync_manager
 from knowledge.schema import KnowledgeEntry
+from dependencies.auth_dep import get_current_user
 
-router = APIRouter(prefix="/knowledge", tags=["knowledge"])
+router = APIRouter(
+    prefix="/knowledge",
+    tags=["knowledge"],
+    dependencies=[Depends(get_current_user)],
+)
 
 @router.post("/add")
 async def add_knowledge(entry: Dict[str, Any]):
@@ -98,4 +103,3 @@ async def search_shared_knowledge(query: str = Query(...), limit: int = Query(5)
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Shared knowledge semantic search failed: {e}"
         )
-

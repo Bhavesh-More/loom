@@ -14,12 +14,17 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, StrictStr
 
 from orchestration.observability.audit_ledger import AuditLedger
+from dependencies.auth_dep import get_current_user
 
-router = APIRouter(prefix="/audit", tags=["audit"])
+router = APIRouter(
+    prefix="/audit",
+    tags=["audit"],
+    dependencies=[Depends(get_current_user)],
+)
 _ledger = AuditLedger()
 
 

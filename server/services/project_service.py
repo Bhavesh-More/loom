@@ -62,11 +62,20 @@ class ProjectService:
         conn = await self.db.get_conn()
 
         try:
-            return await self.project_repository.get_project_by_id_for_user(
+            project = await self.project_repository.get_project_by_id_for_user(
                 conn=conn,
                 project_id=project_id,
                 user_id=user_id
             )
+            if not project:
+                return None
+
+            agent_ids = await self.project_agent_repository.get_project_agents(
+                conn=conn,
+                project_id=project_id
+            )
+            project["agent_ids"] = agent_ids
+            return project
         finally:
             await self.db.release_conn(conn)
 

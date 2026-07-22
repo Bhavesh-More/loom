@@ -83,7 +83,23 @@ def _profile_from_claims(claims: dict[str, Any]) -> tuple[str, str, str]:
 
 async def _upsert_user(conn, claims: dict[str, Any]) -> CurrentUser:
     clerk_user_id, email, name = _profile_from_claims(claims)
+    row = await upsert_user_record(conn, clerk_user_id, email, name)
 
+    return CurrentUser(
+        id=str(row["id"]),
+        clerk_user_id=row["clerk_user_id"],
+        email=row["email"],
+        name=row["name"],
+        claims=claims,
+    )
+
+
+async def upsert_user_record(
+    conn,
+    clerk_user_id: str,
+    email: str,
+    name: str,
+):
     existing = await conn.fetchrow(
         """
         SELECT id, clerk_user_id, email, name
@@ -147,13 +163,7 @@ async def _upsert_user(conn, claims: dict[str, Any]) -> CurrentUser:
                 name,
             )
 
-    return CurrentUser(
-        id=str(row["id"]),
-        clerk_user_id=row["clerk_user_id"],
-        email=row["email"],
-        name=row["name"],
-        claims=claims,
-    )
+    return row
 
 
 async def get_current_user(

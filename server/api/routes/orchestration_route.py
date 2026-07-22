@@ -3,16 +3,21 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from db.database import database
 from orchestration.planning.plan_schema import ExecutionPlan, PipelineResult
 from orchestration.runtime.checkpoint import PipelineCheckpoint
 from orchestration.runtime.orchestrator import PipelineOrchestrator
+from dependencies.auth_dep import get_current_user
 
 
-router = APIRouter(prefix="/api/orchestration", tags=["Orchestration"])
+router = APIRouter(
+    prefix="/api/orchestration",
+    tags=["Orchestration"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 class RunRequest(BaseModel):

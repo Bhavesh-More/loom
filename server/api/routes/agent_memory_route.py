@@ -1,10 +1,14 @@
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from typing import Any, Dict, List, Optional
-from uuid import UUID
 from knowledge.memory_service import memory_service
 from knowledge.memory_models import AgentMemoryEntry, AgentExecutionEntry, AgentDecisionEntry
+from dependencies.auth_dep import get_current_user
 
-router = APIRouter(prefix="/knowledge", tags=["memory"])
+router = APIRouter(
+    prefix="/knowledge",
+    tags=["memory"],
+    dependencies=[Depends(get_current_user)],
+)
 
 @router.post("/memory/add", response_model=AgentMemoryEntry)
 async def add_memory(entry: AgentMemoryEntry):
@@ -86,4 +90,3 @@ async def semantic_search_memories(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Semantic search failed: {e}"
         )
-
